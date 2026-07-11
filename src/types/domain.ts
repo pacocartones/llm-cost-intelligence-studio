@@ -1,4 +1,10 @@
-export type ViewId = 'plan' | 'compare' | 'optimize' | 'explore' | 'forecast'
+export type ViewId =
+  | 'plan'
+  | 'compare'
+  | 'optimize'
+  | 'explore'
+  | 'forecast'
+  | 'portfolio'
 
 export type ProviderId =
   | 'anthropic'
@@ -75,6 +81,27 @@ export interface SavedScenario {
   scenario: ScenarioInput
 }
 
+export type RoutingRoleId = 'router' | 'default' | 'premium'
+
+export interface RoutingSlotInput {
+  roleId: RoutingRoleId
+  roleLabel: string
+  note: string
+  share: number
+  modelId: string
+}
+
+export interface SavedRoutingStack {
+  id: string
+  name: string
+  scenarioName: string
+  baselineModelId: string
+  baselineProviderId: ProviderId
+  createdAt: string
+  scenario: ScenarioInput
+  slots: RoutingSlotInput[]
+}
+
 export interface CostBreakdown {
   inputTokens: number
   recurringInputCost: number
@@ -99,4 +126,15 @@ export interface UseCaseTemplate {
   budgetTier: 'starter' | 'growth' | 'serious'
   tips: string[]
   scenarioSeed: Partial<ScenarioInput>
+}
+
+export interface BenchmarkScore {
+  overall: number
+  quality: number
+  cost: number
+  speed: number
+  fit: number
+  recurring: number
+  monthly: number
+  summary: string
 }

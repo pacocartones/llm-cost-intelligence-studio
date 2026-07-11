@@ -10,9 +10,10 @@ The app is deployed automatically to GitHub Pages from `main` via GitHub Actions
 
 - compares model economics across Anthropic, OpenAI, Google Gemini, Mistral, xAI, and DeepSeek
 - models token costs by scenario shape, output size, caching, and batch assumptions
-- designs multi-model routing mixes instead of assuming a single universal model
-- explores benchmark-style use-case packs for support, coding, research, tutoring, and sales
+- designs, saves, and compares multi-model routing mixes instead of assuming a single universal model
+- scores benchmark-style use-case packs for support, coding, research, tutoring, and sales
 - forecasts recurring spend and margin-sensitive planning metrics
+- compares several products, teams, or deployments at once in portfolio mode
 
 ## Product direction
 

@@ -225,7 +225,7 @@
 
 .section-nav {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 24px;
 }
@@ -1196,6 +1196,19 @@ select:focus {
   color: var(--good);
 }
 
+.routing-savebar,
+.portfolio-controls,
+.portfolio-selector-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.routing-savebar {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  margin-bottom: 14px;
+}
+
 .routing-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1241,6 +1254,26 @@ select:focus {
 
 .routing-card small {
   margin-top: 10px;
+}
+
+.saved-routing-panel {
+  margin-bottom: 18px;
+}
+
+.saved-routing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.saved-routing-card__top,
+.portfolio-card__head,
+.benchmark-score-card__head,
+.benchmark-leader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
 }
 
 .routing-blended {
@@ -1403,6 +1436,127 @@ select:focus {
 .benchmark-card p {
   color: var(--muted);
   margin-bottom: 14px;
+}
+
+.benchmark-card__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.benchmark-lab {
+  margin-bottom: 18px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top right, rgba(99, 102, 241, 0.08), transparent 28%),
+    rgba(15, 23, 42, 0.48);
+  padding: 20px;
+}
+
+.benchmark-leader {
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: rgba(15, 23, 42, 0.45);
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+.benchmark-leader p,
+.benchmark-score-card p {
+  color: var(--muted);
+}
+
+.benchmark-leader__score {
+  min-width: 120px;
+  text-align: right;
+}
+
+.benchmark-leader__score span {
+  display: block;
+  color: var(--muted);
+}
+
+.benchmark-leader__score strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 2.4rem;
+}
+
+.benchmark-score-grid,
+.portfolio-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.benchmark-score-card,
+.portfolio-card {
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: rgba(15, 23, 42, 0.45);
+  padding: 18px;
+}
+
+.benchmark-score-card__head strong,
+.portfolio-card__head strong {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.portfolio-band {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.portfolio-band div {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(34, 211, 238, 0.05), rgba(15, 23, 42, 0.48)),
+    rgba(15, 23, 42, 0.48);
+  padding: 18px;
+}
+
+.portfolio-band span {
+  display: block;
+  color: var(--muted);
+}
+
+.portfolio-band strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 1.5rem;
+}
+
+.portfolio-controls {
+  grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.1fr);
+  margin-bottom: 18px;
+}
+
+.portfolio-selector-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 18px;
+}
+
+.portfolio-selector-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.portfolio-selector-item {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.portfolio-selector-item input {
+  width: auto;
 }
 
 .site-footer__inner {
@@ -1585,6 +1739,9 @@ select:focus {
   .routing-grid,
   .routing-blended,
   .benchmark-grid,
+  .benchmark-score-grid,
+  .portfolio-band,
+  .portfolio-grid,
   .mode-strip,
   .preset-strip,
   .micro-metrics {
@@ -1627,7 +1784,9 @@ select:focus {
   .forecast-controls,
   .optimize-grid,
   .projection-grid,
-  .token-grid {
+  .token-grid,
+  .portfolio-controls,
+  .portfolio-selector-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -1656,7 +1815,11 @@ select:focus {
   .projection-grid,
   .field-grid,
   .token-grid,
-  .forecast-band {
+  .forecast-band,
+  .portfolio-band,
+  .portfolio-controls,
+  .portfolio-selector-grid,
+  .benchmark-score-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1679,6 +1842,11 @@ select:focus {
   }
 
   .routing-share {
+    grid-template-columns: 1fr;
+  }
+
+  .routing-savebar,
+  .benchmark-card__actions {
     grid-template-columns: 1fr;
   }
 }

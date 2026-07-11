@@ -6,6 +6,7 @@ const sections: { id: ViewId; label: string; kicker: string }[] = [
   { id: 'optimize', label: 'Optimize', kicker: 'Find savings' },
   { id: 'explore', label: 'Explore', kicker: 'Use-case templates' },
   { id: 'forecast', label: 'Forecast', kicker: 'Project spend' },
+  { id: 'portfolio', label: 'Portfolio', kicker: 'Compare products' },
 ]
 
 interface SectionNavProps {

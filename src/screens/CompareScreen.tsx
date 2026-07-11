@@ -1,23 +1,21 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { calculateScenarioCost } from '../lib/costing'
-import type { ModelRecord, ScenarioInput } from '../types/domain'
+import {
+  buildDefaultRoutingSlots,
+  buildRoutingMix,
+  buildRoutingMixFromCatalog,
+  routingSlotsEqual,
+  sanitizeRoutingSlots,
+} from '../lib/routing'
+import type {
+  ModelRecord,
+  RoutingRoleId,
+  RoutingSlotInput,
+  SavedRoutingStack,
+  ScenarioInput,
+} from '../types/domain'
 
 type DecisionMode = 'cheapest' | 'balanced' | 'context' | 'premium'
-type RoutingRoleId = 'router' | 'default' | 'premium'
-
-interface CostEntry {
-  model: ModelRecord
-  cost: ReturnType<typeof calculateScenarioCost>
-  score: number
-}
-
-interface RoutingSlot {
-  roleId: RoutingRoleId
-  roleLabel: string
-  note: string
-  share: number
-  modelId: string
-}
 
 const decisionModes: {
   id: DecisionMode
@@ -92,123 +90,15 @@ function getModeNarrative(mode: DecisionMode) {
   return 'Use this lens when you want the best overall product default rather than the absolute cheapest model.'
 }
 
-function buildDefaultRoutingSlots(entries: CostEntry[]) {
-  const routerEntry =
-    entries.find((entry) => entry.model.tier === 'efficient') ?? entries[0]
-  const defaultEntry =
-    entries.find(
-      (entry) =>
-        entry.model.id !== routerEntry.model.id && entry.model.tier === 'balanced',
-    ) ??
-    entries.find((entry) => entry.model.id !== routerEntry.model.id) ??
-    entries[0]
-  const premiumEntry =
-    entries.find(
-      (entry) =>
-        entry.model.id !== routerEntry.model.id &&
-        entry.model.id !== defaultEntry.model.id &&
-        entry.model.tier === 'flagship',
-    ) ??
-    entries.find(
-      (entry) =>
-        entry.model.id !== routerEntry.model.id &&
-        entry.model.id !== defaultEntry.model.id,
-    ) ??
-    defaultEntry
-
-  return [
-    {
-      roleId: 'router' as const,
-      roleLabel: 'Router / cheap path',
-      share: 65,
-      modelId: routerEntry.model.id,
-      note: 'Handles triage, simple transforms, and the bulk of traffic.',
-    },
-    {
-      roleId: 'default' as const,
-      roleLabel: 'Primary default',
-      share: 25,
-      modelId: defaultEntry.model.id,
-      note: 'Owns the main product experience for normal user requests.',
-    },
-    {
-      roleId: 'premium' as const,
-      roleLabel: 'Premium fallback',
-      share: 10,
-      modelId: premiumEntry.model.id,
-      note: 'Reserved for hard reasoning, longer context, or high-value moments.',
-    },
-  ]
-}
-
-function sanitizeRoutingSlots(current: RoutingSlot[], entries: CostEntry[]) {
-  const defaults = buildDefaultRoutingSlots(entries)
-
-  return defaults.map((fallback) => {
-    const existing = current.find((slot) => slot.roleId === fallback.roleId)
-    const modelExists =
-      existing && entries.some((entry) => entry.model.id === existing.modelId)
-
-    return {
-      ...fallback,
-      modelId: modelExists ? existing.modelId : fallback.modelId,
-      share: existing?.share ?? fallback.share,
-    }
-  })
-}
-
-function buildRoutingMix(entries: CostEntry[], slots: RoutingSlot[]) {
-  const totalShare = slots.reduce((total, slot) => total + slot.share, 0)
-  const normalizedTotal = totalShare > 0 ? totalShare : slots.length
-  const stack = slots.map((slot) => {
-    const entry =
-      entries.find((candidate) => candidate.model.id === slot.modelId) ?? entries[0]
-    const normalizedShare =
-      totalShare > 0 ? slot.share / normalizedTotal : 1 / Math.max(slots.length, 1)
-
-    return {
-      ...slot,
-      entry,
-      normalizedShare,
-    }
-  })
-
-  const blendedRecurring = stack.reduce(
-    (total, slot) => total + slot.entry.cost.totalRecurring * slot.normalizedShare,
-    0,
-  )
-  const blendedMonthly = stack.reduce(
-    (total, slot) => total + slot.entry.cost.monthlyRecurring * slot.normalizedShare,
-    0,
-  )
-
-  return {
-    stack,
-    totalShare,
-    blendedRecurring,
-    blendedMonthly,
-  }
-}
-
-function routingSlotsEqual(left: RoutingSlot[], right: RoutingSlot[]) {
-  if (left.length !== right.length) return false
-
-  return left.every((slot, index) => {
-    const candidate = right[index]
-    return (
-      candidate &&
-      slot.roleId === candidate.roleId &&
-      slot.modelId === candidate.modelId &&
-      slot.share === candidate.share
-    )
-  })
-}
-
 interface CompareScreenProps {
   models: ModelRecord[]
   scenario: ScenarioInput
   selectedModelId: string
   selectedProviderId: string
+  savedRoutingStacks: SavedRoutingStack[]
+  routingPreset: SavedRoutingStack | null
+  onSaveRoutingStack: (draft: { name: string; slots: RoutingSlotInput[] }) => void
+  onLoadRoutingStack: (stack: SavedRoutingStack) => void
 }
 
 export function CompareScreen({
@@ -216,9 +106,14 @@ export function CompareScreen({
   scenario,
   selectedModelId,
   selectedProviderId,
+  savedRoutingStacks,
+  routingPreset,
+  onSaveRoutingStack,
+  onLoadRoutingStack,
 }: CompareScreenProps) {
   const [mode, setMode] = useState<DecisionMode>('balanced')
-  const [routingSlots, setRoutingSlots] = useState<RoutingSlot[]>([])
+  const [routingSlots, setRoutingSlots] = useState<RoutingSlotInput[]>([])
+  const [routingName, setRoutingName] = useState(`${scenario.name} routing mix`)
   const sameProvider = models.filter((model) => model.providerId === selectedProviderId)
   const crossProvider = [
     ...sameProvider,
@@ -239,8 +134,7 @@ export function CompareScreen({
       score: getModeScore(entry.model, entry.cost.totalRecurring, cheapestCost, mode),
     }))
     .sort((left, right) => right.score - left.score)
-  const comparison = allEntries
-    .slice(0, 6)
+  const comparison = allEntries.slice(0, 6)
 
   const winner = comparison[0]
   const currentEntry =
@@ -251,17 +145,39 @@ export function CompareScreen({
     comparison.find((entry) => entry.model.tier === 'balanced') ?? comparison[0]
   const efficientEntry =
     comparison.find((entry) => entry.model.tier === 'efficient') ?? comparison[0]
+
   const routingBlueprint = buildRoutingMix(comparison, routingSlots)
-  const normalizedSelectedShare =
-    routingBlueprint.totalShare > 0
-      ? currentEntry.cost.totalRecurring - routingBlueprint.blendedRecurring
-      : 0
+  const savingsVsSelected = currentEntry.cost.totalRecurring - routingBlueprint.blendedRecurring
+
+  const savedStackSummaries = useMemo(
+    () =>
+      savedRoutingStacks.map((stack) => ({
+        stack,
+        cost: buildRoutingMixFromCatalog(models, stack.scenario, stack.slots),
+      })),
+    [models, savedRoutingStacks],
+  )
+
   useEffect(() => {
     setRoutingSlots((current) => {
       const next = sanitizeRoutingSlots(current, comparison)
       return routingSlotsEqual(current, next) ? current : next
     })
   }, [comparison])
+
+  useEffect(() => {
+    setRoutingName(`${scenario.name} routing mix`)
+  }, [scenario.name])
+
+  useEffect(() => {
+    if (!routingPreset) return
+
+    setRoutingName(routingPreset.name)
+    setRoutingSlots((current) => {
+      const next = sanitizeRoutingSlots(routingPreset.slots, comparison)
+      return routingSlotsEqual(current, next) ? current : next
+    })
+  }, [comparison, routingPreset])
 
   function updateRoutingModel(roleId: RoutingRoleId, modelId: string) {
     setRoutingSlots((current) =>
@@ -324,6 +240,13 @@ export function CompareScreen({
           share: normalized,
         }
       })
+    })
+  }
+
+  function saveCurrentRoutingStack() {
+    onSaveRoutingStack({
+      name: routingName.trim() || `${scenario.name} routing mix`,
+      slots: routingSlots,
     })
   }
 
@@ -403,6 +326,21 @@ export function CompareScreen({
             </button>
           </div>
         </div>
+
+        <div className="routing-savebar">
+          <label>
+            Stack name
+            <input
+              type="text"
+              value={routingName}
+              onChange={(event) => setRoutingName(event.target.value)}
+            />
+          </label>
+          <button type="button" className="ghost-button" onClick={saveCurrentRoutingStack}>
+            Save routing stack
+          </button>
+        </div>
+
         <div className={`routing-notice ${routingBlueprint.totalShare === 100 ? 'good' : ''}`}>
           <span>Traffic allocation total</span>
           <strong>{routingBlueprint.totalShare}%</strong>
@@ -410,10 +348,13 @@ export function CompareScreen({
             Normalize to 100%
           </button>
         </div>
+
         <div className="routing-grid">
           {routingBlueprint.stack.map((slot) => (
             <article key={slot.roleId} className="routing-card">
-              <span className="soft-badge">{Math.round(slot.normalizedShare * 100)}% effective share</span>
+              <span className="soft-badge">
+                {Math.round(slot.normalizedShare * 100)}% effective share
+              </span>
               <strong>{slot.roleLabel}</strong>
               <select
                 value={slot.entry.model.id}
@@ -454,6 +395,7 @@ export function CompareScreen({
             </article>
           ))}
         </div>
+
         <div className="routing-blended">
           <div>
             <span>Blended recurring/request</span>
@@ -465,11 +407,59 @@ export function CompareScreen({
           </div>
           <div>
             <span>Savings vs selected model</span>
-            <strong className={normalizedSelectedShare >= 0 ? 'good' : undefined}>
-              {normalizedSelectedShare >= 0 ? '-' : '+'}$
-              {Math.abs(normalizedSelectedShare).toFixed(4)} per request
+            <strong className={savingsVsSelected >= 0 ? 'good' : undefined}>
+              {savingsVsSelected >= 0 ? '-' : '+'}${Math.abs(savingsVsSelected).toFixed(4)} per request
             </strong>
           </div>
+        </div>
+      </section>
+
+      <section className="saved-routing-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Saved stacks</p>
+            <h3>Compare routing mixes across scenarios</h3>
+          </div>
+        </div>
+        <div className="saved-routing-grid">
+          {!savedStackSummaries.length ? (
+            <article className="routing-card">
+              <strong>No saved routing stacks yet</strong>
+              <p>Save a few routing mixes here, then use Portfolio to compare several products or teams at once.</p>
+            </article>
+          ) : null}
+          {savedStackSummaries.map(({ stack, cost }) => (
+            <article key={stack.id} className="routing-card saved-routing-card">
+              <div className="saved-routing-card__top">
+                <div>
+                  <strong>{stack.name}</strong>
+                  <p>{stack.scenarioName}</p>
+                </div>
+                <span className="soft-badge">{new Date(stack.createdAt).toLocaleDateString()}</span>
+              </div>
+              <dl className="template-meta">
+                <div>
+                  <dt>Blended recurring</dt>
+                  <dd>${cost.blendedRecurring.toFixed(4)}</dd>
+                </div>
+                <div>
+                  <dt>Monthly</dt>
+                  <dd>${cost.blendedMonthly.toFixed(2)}</dd>
+                </div>
+                <div>
+                  <dt>Traffic mix</dt>
+                  <dd>{stack.slots.map((slot) => `${slot.share}%`).join(' / ')}</dd>
+                </div>
+              </dl>
+              <button
+                type="button"
+                className="ghost-button template-action"
+                onClick={() => onLoadRoutingStack(stack)}
+              >
+                Load stack
+              </button>
+            </article>
+          ))}
         </div>
       </section>
 
@@ -480,7 +470,7 @@ export function CompareScreen({
         </div>
         <div>
           <span>Selected baseline</span>
-          <strong>{currentEntry?.model.name ?? selectedModelId}</strong>
+          <strong>{currentEntry.model.name}</strong>
         </div>
         <div>
           <span>Winner monthly run-rate</span>
@@ -525,17 +515,18 @@ export function CompareScreen({
                 <dd className={model.id === winner.model.id ? 'good' : undefined}>
                   {model.id === selectedModelId
                     ? 'Current'
-                    : `${cost.totalRecurring < currentEntry.cost.totalRecurring
-                        ? '-'
-                        : '+'}$${Math.abs(
-                        cost.totalRecurring -
-                          currentEntry.cost.totalRecurring,
+                    : `${cost.totalRecurring < currentEntry.cost.totalRecurring ? '-' : '+'}$${Math.abs(
+                        cost.totalRecurring - currentEntry.cost.totalRecurring,
                       ).toFixed(4)}`}
                 </dd>
               </div>
               <div>
                 <dt>Recommendation score</dt>
-                <dd>{winner.model.id === model.id ? 'Top pick' : entryScoreLabel(model.id, comparison)}</dd>
+                <dd>
+                  {winner.model.id === model.id
+                    ? 'Top pick'
+                    : entryScoreLabel(model.id, comparison)}
+                </dd>
               </div>
             </dl>
             <div className="badge-row">

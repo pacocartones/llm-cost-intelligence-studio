@@ -14,21 +14,26 @@ import { ExploreScreen } from './screens/ExploreScreen'
 import { ForecastScreen } from './screens/ForecastScreen'
 import { OptimizeScreen } from './screens/OptimizeScreen'
 import { PlanScreen } from './screens/PlanScreen'
+import { PortfolioScreen } from './screens/PortfolioScreen'
 import type {
   ProviderId,
+  RoutingSlotInput,
   SavedScenario,
+  SavedRoutingStack,
   ScenarioInput,
   UseCaseTemplate,
   ViewId,
 } from './types/domain'
 
 const savedScenariosKey = 'llm-cost-studio-scenarios'
+const savedRoutingStacksKey = 'llm-cost-studio-routing-stacks'
 const headerSections: { id: ViewId; label: string }[] = [
   { id: 'plan', label: 'Plan' },
   { id: 'compare', label: 'Compare' },
   { id: 'optimize', label: 'Optimize' },
   { id: 'explore', label: 'Explore' },
   { id: 'forecast', label: 'Forecast' },
+  { id: 'portfolio', label: 'Portfolio' },
 ]
 
 function loadSavedScenarios() {
@@ -42,6 +47,17 @@ function loadSavedScenarios() {
   }
 }
 
+function loadSavedRoutingStacks() {
+  const raw = window.localStorage.getItem(savedRoutingStacksKey)
+  if (!raw) return [] as SavedRoutingStack[]
+
+  try {
+    return JSON.parse(raw) as SavedRoutingStack[]
+  } catch {
+    return [] as SavedRoutingStack[]
+  }
+}
+
 function App() {
   const [activeView, setActiveView] = useState<ViewId>('plan')
   const [selectedProviderId, setSelectedProviderId] =
@@ -51,6 +67,10 @@ function App() {
   const [savedScenarios, setSavedScenarios] = useState<SavedScenario[]>(() =>
     loadSavedScenarios(),
   )
+  const [savedRoutingStacks, setSavedRoutingStacks] = useState<SavedRoutingStack[]>(() =>
+    loadSavedRoutingStacks(),
+  )
+  const [routingPreset, setRoutingPreset] = useState<SavedRoutingStack | null>(null)
 
   useEffect(() => {
     const nextModel = models.find((model) => model.id === selectedModelId)
@@ -67,6 +87,13 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem(savedScenariosKey, JSON.stringify(savedScenarios))
   }, [savedScenarios])
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      savedRoutingStacksKey,
+      JSON.stringify(savedRoutingStacks),
+    )
+  }, [savedRoutingStacks])
 
   const selectedModel =
     models.find((model) => model.id === selectedModelId) ?? models[0]
@@ -97,6 +124,7 @@ function App() {
   const liveDemoUrl = 'https://pacocartones.github.io/LLM-Cost-Intelligence-Studio/'
 
   function updateScenario(patch: Partial<ScenarioInput>) {
+    setRoutingPreset(null)
     setScenario((current) => ({
       ...current,
       ...patch,
@@ -104,6 +132,7 @@ function App() {
   }
 
   function applyTemplate(template: UseCaseTemplate) {
+    setRoutingPreset(null)
     setScenario((current) => ({
       ...current,
       ...template.scenarioSeed,
@@ -135,10 +164,35 @@ function App() {
   }
 
   function loadScenario(savedScenario: SavedScenario) {
+    setRoutingPreset(null)
     setSelectedProviderId(savedScenario.providerId)
     setSelectedModelId(savedScenario.modelId)
     setScenario(savedScenario.scenario)
     setActiveView('plan')
+  }
+
+  function saveRoutingStack(draft: { name: string; slots: RoutingSlotInput[] }) {
+    const stack: SavedRoutingStack = {
+      id: `${Date.now()}`,
+      name: draft.name,
+      scenarioName: scenario.name,
+      baselineModelId: selectedModel.id,
+      baselineProviderId: selectedProvider.id,
+      createdAt: new Date().toISOString(),
+      scenario,
+      slots: draft.slots,
+    }
+
+    setSavedRoutingStacks((current) => [stack, ...current].slice(0, 12))
+    setRoutingPreset(stack)
+  }
+
+  function loadRoutingStack(stack: SavedRoutingStack) {
+    setSelectedProviderId(stack.baselineProviderId)
+    setSelectedModelId(stack.baselineModelId)
+    setScenario(stack.scenario)
+    setRoutingPreset(stack)
+    setActiveView('compare')
   }
 
   return (
@@ -328,6 +382,10 @@ function App() {
               scenario={scenario}
               selectedModelId={selectedModelId}
               selectedProviderId={selectedProviderId}
+              savedRoutingStacks={savedRoutingStacks}
+              routingPreset={routingPreset}
+              onSaveRoutingStack={saveRoutingStack}
+              onLoadRoutingStack={loadRoutingStack}
             />
           ) : null}
 
@@ -350,6 +408,16 @@ function App() {
 
           {activeView === 'forecast' ? (
             <ForecastScreen scenario={scenario} cost={currentCost} />
+          ) : null}
+
+          {activeView === 'portfolio' ? (
+            <PortfolioScreen
+              templates={useCaseTemplates}
+              models={models}
+              savedRoutingStacks={savedRoutingStacks}
+              onApplyTemplate={applyTemplate}
+              onLoadRoutingStack={loadRoutingStack}
+            />
           ) : null}
         </main>
       </div>

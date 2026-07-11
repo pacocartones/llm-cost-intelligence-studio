@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { rankBenchmarkModels } from '../lib/benchmarks'
 import type { ModelRecord, UseCaseTemplate } from '../types/domain'
 
 type ExploreFilter = 'all' | 'starter' | 'growth' | 'serious'
@@ -76,24 +77,6 @@ export function ExploreScreen({
   onApplyTemplate,
 }: ExploreScreenProps) {
   const [filter, setFilter] = useState<ExploreFilter>('all')
-  const visibleTemplates = useMemo(
-    () =>
-      filter === 'all'
-        ? templates
-        : templates.filter((template) => template.budgetTier === filter),
-    [filter, templates],
-  )
-  const referencedProviderCount = useMemo(
-    () =>
-      new Set(
-        templates.flatMap((template) =>
-          template.suggestedModelIds
-            .map((id) => models.find((model) => model.id === id)?.providerId)
-            .filter(Boolean),
-        ),
-      ).size,
-    [models, templates],
-  )
   const benchmarkCards = useMemo(
     () =>
       benchmarkPacks.reduce<Array<(typeof benchmarkPacks)[number] & { template: UseCaseTemplate }>>(
@@ -112,6 +95,37 @@ export function ExploreScreen({
       ),
     [templates],
   )
+  const [selectedBenchmarkId, setSelectedBenchmarkId] = useState<string>(
+    benchmarkPacks[0].templateId,
+  )
+
+  const visibleTemplates = useMemo(
+    () =>
+      filter === 'all'
+        ? templates
+        : templates.filter((template) => template.budgetTier === filter),
+    [filter, templates],
+  )
+  const referencedProviderCount = useMemo(
+    () =>
+      new Set(
+        templates.flatMap((template) =>
+          template.suggestedModelIds
+            .map((id) => models.find((model) => model.id === id)?.providerId)
+            .filter(Boolean),
+        ),
+      ).size,
+    [models, templates],
+  )
+  const selectedBenchmark =
+    benchmarkCards.find((pack) => pack.template.id === selectedBenchmarkId) ??
+    benchmarkCards[0]
+  const benchmarkRanking = useMemo(
+    () =>
+      selectedBenchmark ? rankBenchmarkModels(models, selectedBenchmark.template) : [],
+    [models, selectedBenchmark],
+  )
+  const benchmarkLeader = benchmarkRanking[0]
 
   return (
     <section className="panel">
@@ -215,24 +229,92 @@ export function ExploreScreen({
                   <dd>{pack.successMetric}</dd>
                 </div>
               </dl>
-              <button
-                type="button"
-                className="ghost-button template-action"
-                onClick={() => onApplyTemplate(pack.template)}
-              >
-                Load benchmark
-              </button>
+              <div className="benchmark-card__actions">
+                <button
+                  type="button"
+                  className="ghost-button"
+                  onClick={() => setSelectedBenchmarkId(pack.template.id)}
+                >
+                  Score models
+                </button>
+                <button
+                  type="button"
+                  className="ghost-button"
+                  onClick={() => onApplyTemplate(pack.template)}
+                >
+                  Load benchmark
+                </button>
+              </div>
             </article>
           ))}
         </div>
       </section>
+
+      {selectedBenchmark && benchmarkLeader ? (
+        <section className="benchmark-lab">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">Benchmark scoring</p>
+              <h3>{selectedBenchmark.template.name} model leaderboard</h3>
+            </div>
+          </div>
+          <div className="benchmark-leader">
+            <div>
+              <span className="soft-badge">Top simulated fit</span>
+              <h3>{benchmarkLeader.model.name}</h3>
+              <p>{benchmarkLeader.score.summary}</p>
+            </div>
+            <div className="benchmark-leader__score">
+              <span>Overall score</span>
+              <strong>{benchmarkLeader.score.overall}</strong>
+            </div>
+          </div>
+          <div className="benchmark-score-grid">
+            {benchmarkRanking.slice(0, 4).map(({ model, score }, index) => (
+              <article key={model.id} className="benchmark-score-card">
+                <div className="benchmark-score-card__head">
+                  <div>
+                    <span className="soft-badge">#{index + 1}</span>
+                    <h4>{model.name}</h4>
+                  </div>
+                  <strong>{score.overall}</strong>
+                </div>
+                <dl className="template-meta">
+                  <div>
+                    <dt>Quality</dt>
+                    <dd>{score.quality}</dd>
+                  </div>
+                  <div>
+                    <dt>Cost fit</dt>
+                    <dd>{score.cost}</dd>
+                  </div>
+                  <div>
+                    <dt>Speed</dt>
+                    <dd>{score.speed}</dd>
+                  </div>
+                  <div>
+                    <dt>Workflow fit</dt>
+                    <dd>{score.fit}</dd>
+                  </div>
+                  <div>
+                    <dt>Monthly</dt>
+                    <dd>${score.monthly.toFixed(2)}</dd>
+                  </div>
+                </dl>
+                <p>{score.summary}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <div className="template-grid">
         {!visibleTemplates.length ? (
           <article className="template-card">
             <h3>No templates in this filter yet</h3>
             <p>
-              This budget tier is a good place to add more scenario packs later, such as RAG-heavy backoffice tools or multi-agent internal workflows.
+              This budget tier is a good place to add more scenario packs later, such as
+              RAG-heavy backoffice tools or multi-agent internal workflows.
             </p>
           </article>
         ) : null}
