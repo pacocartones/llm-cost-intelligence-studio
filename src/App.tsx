@@ -23,6 +23,13 @@ import type {
 } from './types/domain'
 
 const savedScenariosKey = 'llm-cost-studio-scenarios'
+const headerSections: { id: ViewId; label: string }[] = [
+  { id: 'plan', label: 'Plan' },
+  { id: 'compare', label: 'Compare' },
+  { id: 'optimize', label: 'Optimize' },
+  { id: 'explore', label: 'Explore' },
+  { id: 'forecast', label: 'Forecast' },
+]
 
 function loadSavedScenarios() {
   const raw = window.localStorage.getItem(savedScenariosKey)
@@ -86,6 +93,8 @@ function App() {
       ? Math.round((catalogHealth.verifiedModels / catalogHealth.modelCount) * 100)
       : 0
   const cheapestScenarioModel = rankedModels[0]
+  const repoUrl = 'https://github.com/pacocartones/LLM-Cost-Intelligence-Studio'
+  const liveDemoUrl = 'https://pacocartones.github.io/LLM-Cost-Intelligence-Studio/'
 
   function updateScenario(patch: Partial<ScenarioInput>) {
     setScenario((current) => ({
@@ -133,165 +142,245 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <div className="topbar-main">
-          <p className="eyebrow">Verified pricing intelligence</p>
-          <h1>LLM Cost Intelligence Studio</h1>
-          <p className="hero-copy">
-            A multi-provider workspace for planning AI economics across Anthropic,
-            OpenAI, Gemini, Mistral, xAI, and DeepSeek with source-linked pricing,
-            comparison, optimization, and forecast workflows.
-          </p>
-          <div className="hero-pill-row">
-            <span className="hero-pill">
-              {catalogHealth.verifiedProviders}/{providers.length} providers verified
+    <div className="site-shell">
+      <header className="site-header">
+        <div className="site-header__inner">
+          <button
+            type="button"
+            className="site-brand"
+            onClick={() => setActiveView('plan')}
+          >
+            <span className="site-brand__mark">LCI</span>
+            <span className="site-brand__copy">
+              <strong>LLM Cost Intelligence Studio</strong>
+              <small>Multi-provider AI economics workspace</small>
             </span>
-            <span className="hero-pill">{catalogHealth.verifiedModels} verified models</span>
-            <span className="hero-pill">{catalogHealth.sourceLinkedModels} source-linked cards</span>
-          </div>
-        </div>
-        <div className="topbar-card">
-          <span>Current planning stack</span>
-          <strong>{selectedModel.name}</strong>
-          <small>{selectedProvider.name}</small>
-          <div className="topbar-card__metrics">
-            <div>
-              <span>Recurring per request</span>
-              <strong>${currentCost.totalRecurring.toFixed(4)}</strong>
-            </div>
-            <div>
-              <span>Pricing status</span>
-              <strong>{selectedProvider.pricingStatus}</strong>
-            </div>
-            <div>
-              <span>Last verified</span>
-              <strong>{selectedProvider.pricingLastVerified}</strong>
-            </div>
+          </button>
+
+          <nav className="site-header__nav" aria-label="Site">
+            {headerSections.map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                className={section.id === activeView ? 'active' : ''}
+                onClick={() => setActiveView(section.id)}
+              >
+                {section.label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="site-header__actions">
+            <a className="text-link" href={selectedProvider.sourceUrl} target="_blank" rel="noreferrer">
+              Pricing source
+            </a>
+            <a className="ghost-button" href={repoUrl} target="_blank" rel="noreferrer">
+              GitHub
+            </a>
           </div>
         </div>
       </header>
 
-      <section className="overview-band">
-        <article className="overview-card">
-          <span>Catalog coverage</span>
-          <strong>{catalogHealth.modelCount}</strong>
-          <small>{providers.length} providers mapped into the workspace</small>
-        </article>
-        <article className="overview-card">
-          <span>Verified coverage</span>
-          <strong>{verifiedCoverage}%</strong>
-          <small>
-            {catalogHealth.verifiedModels} verified, {catalogHealth.mixedModels} mixed,
-            {catalogHealth.seedModels} seed
-          </small>
-        </article>
-        <article className="overview-card">
-          <span>Current monthly run-rate</span>
-          <strong>${currentCost.monthlyRecurring.toFixed(0)}</strong>
-          <small>{scenario.requestsPerDay.toLocaleString()} daily requests modeled</small>
-        </article>
-        <article className="overview-card">
-          <span>Scenario floor</span>
-          <strong>${cheapestScenarioModel.monthly.toFixed(0)}</strong>
-          <small>
-            {cheapestScenarioModel.model.name} is the cheapest fit for this workload
-          </small>
-        </article>
-      </section>
+      <div className="app-shell">
+        <header className="topbar">
+          <div className="topbar-main">
+            <p className="eyebrow">Verified pricing intelligence</p>
+            <h1>LLM Cost Intelligence Studio</h1>
+            <p className="hero-copy">
+              A multi-provider workspace for planning AI economics across Anthropic,
+              OpenAI, Gemini, Mistral, xAI, and DeepSeek with source-linked pricing,
+              comparison, optimization, benchmark exploration, and forecast workflows.
+            </p>
+            <div className="hero-pill-row">
+              <span className="hero-pill">
+                {catalogHealth.verifiedProviders}/{providers.length} providers verified
+              </span>
+              <span className="hero-pill">{catalogHealth.verifiedModels} verified models</span>
+              <span className="hero-pill">{catalogHealth.sourceLinkedModels} source-linked cards</span>
+            </div>
+            <div className="hero-action-row">
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => setActiveView('compare')}
+              >
+                Build routing mix
+              </button>
+              <a className="text-link" href={liveDemoUrl} target="_blank" rel="noreferrer">
+                Public demo
+              </a>
+            </div>
+          </div>
+          <div className="topbar-card">
+            <span>Current planning stack</span>
+            <strong>{selectedModel.name}</strong>
+            <small>{selectedProvider.name}</small>
+            <div className="topbar-card__metrics">
+              <div>
+                <span>Recurring per request</span>
+                <strong>${currentCost.totalRecurring.toFixed(4)}</strong>
+              </div>
+              <div>
+                <span>Pricing status</span>
+                <strong>{selectedProvider.pricingStatus}</strong>
+              </div>
+              <div>
+                <span>Last verified</span>
+                <strong>{selectedProvider.pricingLastVerified}</strong>
+              </div>
+            </div>
+          </div>
+        </header>
 
-      <section className="trust-band">
-        <article className="trust-card">
-          <span className="eyebrow">Catalog pulse</span>
-          <h3>Built to answer “which model should we ship?” not just “what does one prompt cost?”</h3>
-          <p>
-            Every provider card is linked to a primary pricing source, so the product can
-            evolve into a serious planning surface for routing, budgeting, and AI portfolio
-            decisions.
-          </p>
-        </article>
-        <article className="trust-card compact-stat">
-          <span>Cost per active user</span>
-          <strong>${costPerUser.toFixed(2)}</strong>
-          <small>{scenario.activeUsers.toLocaleString()} active users assumed</small>
-        </article>
-        <article className="trust-card compact-stat">
-          <span>Cost per 1k requests</span>
-          <strong>${costPer1kRequests.toFixed(2)}</strong>
-          <small>Useful for pricing your own product tiers and margins</small>
-        </article>
-      </section>
+        <section className="overview-band">
+          <article className="overview-card">
+            <span>Catalog coverage</span>
+            <strong>{catalogHealth.modelCount}</strong>
+            <small>{providers.length} providers mapped into the workspace</small>
+          </article>
+          <article className="overview-card">
+            <span>Verified coverage</span>
+            <strong>{verifiedCoverage}%</strong>
+            <small>
+              {catalogHealth.verifiedModels} verified, {catalogHealth.mixedModels} mixed,
+              {catalogHealth.seedModels} seed
+            </small>
+          </article>
+          <article className="overview-card">
+            <span>Current monthly run-rate</span>
+            <strong>${currentCost.monthlyRecurring.toFixed(0)}</strong>
+            <small>{scenario.requestsPerDay.toLocaleString()} daily requests modeled</small>
+          </article>
+          <article className="overview-card">
+            <span>Scenario floor</span>
+            <strong>${cheapestScenarioModel.monthly.toFixed(0)}</strong>
+            <small>
+              {cheapestScenarioModel.model.name} is the cheapest fit for this workload
+            </small>
+          </article>
+        </section>
 
-      <SectionNav activeView={activeView} onChange={setActiveView} />
+        <section className="trust-band">
+          <article className="trust-card">
+            <span className="eyebrow">Catalog pulse</span>
+            <h3>Built to answer “which model should we ship?” not just “what does one prompt cost?”</h3>
+            <p>
+              Every provider card is linked to a primary pricing source, so the product can
+              evolve into a serious planning surface for routing, budgeting, and AI portfolio
+              decisions.
+            </p>
+          </article>
+          <article className="trust-card compact-stat">
+            <span>Cost per active user</span>
+            <strong>${costPerUser.toFixed(2)}</strong>
+            <small>{scenario.activeUsers.toLocaleString()} active users assumed</small>
+          </article>
+          <article className="trust-card compact-stat">
+            <span>Cost per 1k requests</span>
+            <strong>${costPer1kRequests.toFixed(2)}</strong>
+            <small>Useful for pricing your own product tiers and margins</small>
+          </article>
+        </section>
 
-      <ModelPicker
-        models={models}
-        providers={providers}
-        providerId={selectedProviderId}
-        selectedModelId={selectedModelId}
-        onProviderChange={setSelectedProviderId}
-        onModelChange={setSelectedModelId}
-      />
+        <SectionNav activeView={activeView} onChange={setActiveView} />
 
-      <main className="content-stack">
-        {activeView === 'plan' ? (
-          <>
-            <PlanScreen
-              provider={selectedProvider}
+        <ModelPicker
+          models={models}
+          providers={providers}
+          providerId={selectedProviderId}
+          selectedModelId={selectedModelId}
+          onProviderChange={setSelectedProviderId}
+          onModelChange={setSelectedModelId}
+        />
+
+        <main className="content-stack">
+          {activeView === 'plan' ? (
+            <>
+              <PlanScreen
+                provider={selectedProvider}
+                model={selectedModel}
+                scenario={scenario}
+                cost={currentCost}
+                insights={insights}
+                costPer1kRequests={costPer1kRequests}
+                costPerUser={costPerUser}
+                alternativeModel={
+                  alternativeModel
+                    ? {
+                        name: alternativeModel.model.name,
+                        recurring: alternativeModel.recurring,
+                        delta: alternativeModel.deltaFromSelected,
+                      }
+                    : null
+                }
+                templates={useCaseTemplates}
+                onScenarioChange={updateScenario}
+                onSaveScenario={saveScenario}
+                onApplyTemplate={applyTemplate}
+              />
+              <RecentScenarios scenarios={savedScenarios} onLoad={loadScenario} />
+            </>
+          ) : null}
+
+          {activeView === 'compare' ? (
+            <CompareScreen
+              models={models}
+              scenario={scenario}
+              selectedModelId={selectedModelId}
+              selectedProviderId={selectedProviderId}
+            />
+          ) : null}
+
+          {activeView === 'optimize' ? (
+            <OptimizeScreen
               model={selectedModel}
               scenario={scenario}
-              cost={currentCost}
               insights={insights}
-              costPer1kRequests={costPer1kRequests}
-              costPerUser={costPerUser}
-              alternativeModel={
-                alternativeModel
-                  ? {
-                      name: alternativeModel.model.name,
-                      recurring: alternativeModel.recurring,
-                      delta: alternativeModel.deltaFromSelected,
-                    }
-                  : null
-              }
+              optimizationPlan={optimizationPlan}
+            />
+          ) : null}
+
+          {activeView === 'explore' ? (
+            <ExploreScreen
               templates={useCaseTemplates}
-              onScenarioChange={updateScenario}
-              onSaveScenario={saveScenario}
+              models={models}
               onApplyTemplate={applyTemplate}
             />
-            <RecentScenarios scenarios={savedScenarios} onLoad={loadScenario} />
-          </>
-        ) : null}
+          ) : null}
 
-        {activeView === 'compare' ? (
-          <CompareScreen
-            models={models}
-            scenario={scenario}
-            selectedModelId={selectedModelId}
-            selectedProviderId={selectedProviderId}
-          />
-        ) : null}
+          {activeView === 'forecast' ? (
+            <ForecastScreen scenario={scenario} cost={currentCost} />
+          ) : null}
+        </main>
+      </div>
 
-        {activeView === 'optimize' ? (
-          <OptimizeScreen
-            model={selectedModel}
-            scenario={scenario}
-            insights={insights}
-            optimizationPlan={optimizationPlan}
-          />
-        ) : null}
-
-        {activeView === 'explore' ? (
-          <ExploreScreen
-            templates={useCaseTemplates}
-            models={models}
-            onApplyTemplate={applyTemplate}
-          />
-        ) : null}
-
-        {activeView === 'forecast' ? (
-          <ForecastScreen scenario={scenario} cost={currentCost} />
-        ) : null}
-      </main>
+      <footer className="site-footer">
+        <div className="site-footer__inner">
+          <div className="site-footer__copy">
+            <strong>LLM Cost Intelligence Studio</strong>
+            <p>
+              Product planning for AI economics: estimate, compare, route, optimize, and
+              forecast across multiple model providers.
+            </p>
+          </div>
+          <div className="site-footer__links">
+            <a href={liveDemoUrl} target="_blank" rel="noreferrer">
+              Live demo
+            </a>
+            <a href={repoUrl} target="_blank" rel="noreferrer">
+              GitHub repo
+            </a>
+            <a href={selectedProvider.sourceUrl} target="_blank" rel="noreferrer">
+              Current pricing source
+            </a>
+          </div>
+          <div className="site-footer__meta">
+            <span>{catalogHealth.verifiedProviders} verified providers</span>
+            <span>{catalogHealth.verifiedModels} verified models</span>
+            <span>Token economics first, infra costs next</span>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }

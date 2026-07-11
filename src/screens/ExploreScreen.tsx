@@ -9,6 +9,33 @@ interface ExploreScreenProps {
   onApplyTemplate: (template: UseCaseTemplate) => void
 }
 
+const benchmarkPacks = [
+  {
+    templateId: 'support-copilot',
+    headline: 'Lean support benchmark',
+    stressor: 'Tests retrieval discipline, throughput, and short-answer economics.',
+    successMetric: 'Keep recurring cost low without letting context bloat dominate.',
+  },
+  {
+    templateId: 'coding-assistant',
+    headline: 'Developer copilot benchmark',
+    stressor: 'Stresses long context, tool overhead, and escalation to premium models.',
+    successMetric: 'Find a cheap default path with a strong premium fallback.',
+  },
+  {
+    templateId: 'research-assistant',
+    headline: 'Research workflow benchmark',
+    stressor: 'Pushes grounding, synthesis, and output-length economics.',
+    successMetric: 'Separate retrieval and synthesis so output quality justifies cost.',
+  },
+  {
+    templateId: 'ai-tutor',
+    headline: 'High-volume education benchmark',
+    stressor: 'Reveals how multi-turn growth compounds token costs at scale.',
+    successMetric: 'Use cheap turn-by-turn routing and save premium reasoning for special moments.',
+  },
+] as const
+
 const ambitionTracks = [
   {
     title: 'AI portfolio planner',
@@ -66,6 +93,24 @@ export function ExploreScreen({
         ),
       ).size,
     [models, templates],
+  )
+  const benchmarkCards = useMemo(
+    () =>
+      benchmarkPacks.reduce<Array<(typeof benchmarkPacks)[number] & { template: UseCaseTemplate }>>(
+        (list, pack) => {
+          const template = templates.find((entry) => entry.id === pack.templateId)
+          if (!template) return list
+
+          list.push({
+            ...pack,
+            template,
+          })
+
+          return list
+        },
+        [],
+      ),
+    [templates],
   )
 
   return (
@@ -140,6 +185,45 @@ export function ExploreScreen({
               <li key={move}>{move}</li>
             ))}
           </ul>
+        </div>
+      </section>
+
+      <section className="benchmark-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Benchmark library</p>
+            <h3>Scenario packs that pressure-test different AI product patterns</h3>
+          </div>
+        </div>
+        <div className="benchmark-grid">
+          {benchmarkCards.map((pack) => (
+            <article key={pack.template.id} className="benchmark-card">
+              <span className="soft-badge">{pack.template.category}</span>
+              <h3>{pack.headline}</h3>
+              <p>{pack.stressor}</p>
+              <dl className="template-meta">
+                <div>
+                  <dt>Template</dt>
+                  <dd>{pack.template.name}</dd>
+                </div>
+                <div>
+                  <dt>Budget band</dt>
+                  <dd>{pack.template.budgetTier}</dd>
+                </div>
+                <div>
+                  <dt>Success metric</dt>
+                  <dd>{pack.successMetric}</dd>
+                </div>
+              </dl>
+              <button
+                type="button"
+                className="ghost-button template-action"
+                onClick={() => onApplyTemplate(pack.template)}
+              >
+                Load benchmark
+              </button>
+            </article>
+          ))}
         </div>
       </section>
 

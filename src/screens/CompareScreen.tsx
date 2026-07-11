@@ -1,8 +1,23 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { calculateScenarioCost } from '../lib/costing'
 import type { ModelRecord, ScenarioInput } from '../types/domain'
 
 type DecisionMode = 'cheapest' | 'balanced' | 'context' | 'premium'
+type RoutingRoleId = 'router' | 'default' | 'premium'
+
+interface CostEntry {
+  model: ModelRecord
+  cost: ReturnType<typeof calculateScenarioCost>
+  score: number
+}
+
+interface RoutingSlot {
+  roleId: RoutingRoleId
+  roleLabel: string
+  note: string
+  share: number
+  modelId: string
+}
 
 const decisionModes: {
   id: DecisionMode
@@ -77,12 +92,7 @@ function getModeNarrative(mode: DecisionMode) {
   return 'Use this lens when you want the best overall product default rather than the absolute cheapest model.'
 }
 
-function buildRoutingBlueprint(
-  entries: Array<{
-    model: ModelRecord
-    cost: ReturnType<typeof calculateScenarioCost>
-  }>,
-) {
+function buildDefaultRoutingSlots(entries: CostEntry[]) {
   const routerEntry =
     entries.find((entry) => entry.model.tier === 'efficient') ?? entries[0]
   const defaultEntry =
@@ -106,41 +116,92 @@ function buildRoutingBlueprint(
     ) ??
     defaultEntry
 
-  const stack = [
+  return [
     {
-      role: 'Router / cheap path',
-      share: 0.65,
-      entry: routerEntry,
+      roleId: 'router' as const,
+      roleLabel: 'Router / cheap path',
+      share: 65,
+      modelId: routerEntry.model.id,
       note: 'Handles triage, simple transforms, and the bulk of traffic.',
     },
     {
-      role: 'Primary default',
-      share: 0.25,
-      entry: defaultEntry,
+      roleId: 'default' as const,
+      roleLabel: 'Primary default',
+      share: 25,
+      modelId: defaultEntry.model.id,
       note: 'Owns the main product experience for normal user requests.',
     },
     {
-      role: 'Premium fallback',
-      share: 0.1,
-      entry: premiumEntry,
+      roleId: 'premium' as const,
+      roleLabel: 'Premium fallback',
+      share: 10,
+      modelId: premiumEntry.model.id,
       note: 'Reserved for hard reasoning, longer context, or high-value moments.',
     },
   ]
+}
+
+function sanitizeRoutingSlots(current: RoutingSlot[], entries: CostEntry[]) {
+  const defaults = buildDefaultRoutingSlots(entries)
+
+  return defaults.map((fallback) => {
+    const existing = current.find((slot) => slot.roleId === fallback.roleId)
+    const modelExists =
+      existing && entries.some((entry) => entry.model.id === existing.modelId)
+
+    return {
+      ...fallback,
+      modelId: modelExists ? existing.modelId : fallback.modelId,
+      share: existing?.share ?? fallback.share,
+    }
+  })
+}
+
+function buildRoutingMix(entries: CostEntry[], slots: RoutingSlot[]) {
+  const totalShare = slots.reduce((total, slot) => total + slot.share, 0)
+  const normalizedTotal = totalShare > 0 ? totalShare : slots.length
+  const stack = slots.map((slot) => {
+    const entry =
+      entries.find((candidate) => candidate.model.id === slot.modelId) ?? entries[0]
+    const normalizedShare =
+      totalShare > 0 ? slot.share / normalizedTotal : 1 / Math.max(slots.length, 1)
+
+    return {
+      ...slot,
+      entry,
+      normalizedShare,
+    }
+  })
 
   const blendedRecurring = stack.reduce(
-    (total, slot) => total + slot.entry.cost.totalRecurring * slot.share,
+    (total, slot) => total + slot.entry.cost.totalRecurring * slot.normalizedShare,
     0,
   )
   const blendedMonthly = stack.reduce(
-    (total, slot) => total + slot.entry.cost.monthlyRecurring * slot.share,
+    (total, slot) => total + slot.entry.cost.monthlyRecurring * slot.normalizedShare,
     0,
   )
 
   return {
     stack,
+    totalShare,
     blendedRecurring,
     blendedMonthly,
   }
+}
+
+function routingSlotsEqual(left: RoutingSlot[], right: RoutingSlot[]) {
+  if (left.length !== right.length) return false
+
+  return left.every((slot, index) => {
+    const candidate = right[index]
+    return (
+      candidate &&
+      slot.roleId === candidate.roleId &&
+      slot.modelId === candidate.modelId &&
+      slot.share === candidate.share
+    )
+  })
 }
 
 interface CompareScreenProps {
@@ -157,6 +218,7 @@ export function CompareScreen({
   selectedProviderId,
 }: CompareScreenProps) {
   const [mode, setMode] = useState<DecisionMode>('balanced')
+  const [routingSlots, setRoutingSlots] = useState<RoutingSlot[]>([])
   const sameProvider = models.filter((model) => model.providerId === selectedProviderId)
   const crossProvider = [
     ...sameProvider,
@@ -189,7 +251,81 @@ export function CompareScreen({
     comparison.find((entry) => entry.model.tier === 'balanced') ?? comparison[0]
   const efficientEntry =
     comparison.find((entry) => entry.model.tier === 'efficient') ?? comparison[0]
-  const routingBlueprint = buildRoutingBlueprint(comparison)
+  const routingBlueprint = buildRoutingMix(comparison, routingSlots)
+  const normalizedSelectedShare =
+    routingBlueprint.totalShare > 0
+      ? currentEntry.cost.totalRecurring - routingBlueprint.blendedRecurring
+      : 0
+  useEffect(() => {
+    setRoutingSlots((current) => {
+      const next = sanitizeRoutingSlots(current, comparison)
+      return routingSlotsEqual(current, next) ? current : next
+    })
+  }, [comparison])
+
+  function updateRoutingModel(roleId: RoutingRoleId, modelId: string) {
+    setRoutingSlots((current) =>
+      current.map((slot) => (slot.roleId === roleId ? { ...slot, modelId } : slot)),
+    )
+  }
+
+  function updateRoutingShare(roleId: RoutingRoleId, share: number) {
+    const nextShare = Math.max(0, Math.min(100, share))
+    setRoutingSlots((current) =>
+      current.map((slot) => (slot.roleId === roleId ? { ...slot, share: nextShare } : slot)),
+    )
+  }
+
+  function applyRoutingPreset(preset: 'cost' | 'balanced' | 'premium') {
+    const defaults = buildDefaultRoutingSlots(comparison)
+    const efficient = defaults.find((slot) => slot.roleId === 'router') ?? defaults[0]
+    const balanced = defaults.find((slot) => slot.roleId === 'default') ?? defaults[1]
+    const premium = defaults.find((slot) => slot.roleId === 'premium') ?? defaults[2]
+
+    if (preset === 'cost') {
+      setRoutingSlots([
+        { ...efficient, share: 75 },
+        { ...balanced, share: 20 },
+        { ...premium, share: 5 },
+      ])
+      return
+    }
+
+    if (preset === 'premium') {
+      setRoutingSlots([
+        { ...efficient, share: 35 },
+        { ...balanced, share: 35 },
+        { ...premium, share: 30 },
+      ])
+      return
+    }
+
+    setRoutingSlots([
+      { ...efficient, share: 60 },
+      { ...balanced, share: 30 },
+      { ...premium, share: 10 },
+    ])
+  }
+
+  function normalizeRoutingShares() {
+    setRoutingSlots((current) => {
+      const total = current.reduce((sum, slot) => sum + slot.share, 0)
+      if (total <= 0) return sanitizeRoutingSlots(current, comparison)
+
+      let remainder = 100
+      return current.map((slot, index) => {
+        const normalized =
+          index === current.length - 1
+            ? remainder
+            : Math.round((slot.share / total) * 100)
+        remainder -= normalized
+        return {
+          ...slot,
+          share: normalized,
+        }
+      })
+    })
+  }
 
   return (
     <section className="panel">
@@ -245,14 +381,73 @@ export function CompareScreen({
         <div className="panel-heading">
           <div>
             <p className="eyebrow">Routing blueprint</p>
-            <h3>Suggested multi-model stack for this workload</h3>
+            <h3>Design your own multi-model stack for this workload</h3>
           </div>
+          <div className="routing-actions">
+            <button type="button" className="ghost-button" onClick={() => applyRoutingPreset('cost')}>
+              Cost-first
+            </button>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => applyRoutingPreset('balanced')}
+            >
+              Balanced
+            </button>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => applyRoutingPreset('premium')}
+            >
+              Premium moments
+            </button>
+          </div>
+        </div>
+        <div className={`routing-notice ${routingBlueprint.totalShare === 100 ? 'good' : ''}`}>
+          <span>Traffic allocation total</span>
+          <strong>{routingBlueprint.totalShare}%</strong>
+          <button type="button" className="text-link" onClick={normalizeRoutingShares}>
+            Normalize to 100%
+          </button>
         </div>
         <div className="routing-grid">
           {routingBlueprint.stack.map((slot) => (
-            <article key={slot.role} className="routing-card">
-              <span className="soft-badge">{Math.round(slot.share * 100)}% traffic</span>
-              <strong>{slot.role}</strong>
+            <article key={slot.roleId} className="routing-card">
+              <span className="soft-badge">{Math.round(slot.normalizedShare * 100)}% effective share</span>
+              <strong>{slot.roleLabel}</strong>
+              <select
+                value={slot.entry.model.id}
+                onChange={(event) => updateRoutingModel(slot.roleId, event.target.value)}
+              >
+                {comparison.map((entry) => (
+                  <option key={entry.model.id} value={entry.model.id}>
+                    {entry.model.name}
+                  </option>
+                ))}
+              </select>
+              <div className="routing-share">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={slot.share}
+                  onChange={(event) =>
+                    updateRoutingShare(slot.roleId, Number(event.target.value) || 0)
+                  }
+                />
+                <label>
+                  Traffic %
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={slot.share}
+                    onChange={(event) =>
+                      updateRoutingShare(slot.roleId, Number(event.target.value) || 0)
+                    }
+                  />
+                </label>
+              </div>
               <h4>{slot.entry.model.name}</h4>
               <p>{slot.note}</p>
               <small>${slot.entry.cost.totalRecurring.toFixed(4)} recurring per request</small>
@@ -269,8 +464,11 @@ export function CompareScreen({
             <strong>${routingBlueprint.blendedMonthly.toFixed(2)}</strong>
           </div>
           <div>
-            <span>Why it matters</span>
-            <strong>Most real AI products ship mixes, not one universal model</strong>
+            <span>Savings vs selected model</span>
+            <strong className={normalizedSelectedShare >= 0 ? 'good' : undefined}>
+              {normalizedSelectedShare >= 0 ? '-' : '+'}$
+              {Math.abs(normalizedSelectedShare).toFixed(4)} per request
+            </strong>
           </div>
         </div>
       </section>

@@ -1,0 +1,56 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" rx="36" fill="#08111F"/>
+  <rect width="1200" height="630" rx="36" fill="url(#bgGlow)"/>
+  <g opacity="0.8">
+    <circle cx="187" cy="133" r="210" fill="url(#leftGlow)"/>
+    <circle cx="1020" cy="156" r="180" fill="url(#rightGlow)"/>
+  </g>
+  <rect x="64" y="64" width="1072" height="502" rx="28" fill="rgba(9,18,33,0.86)" stroke="rgba(148,163,184,0.16)"/>
+  <rect x="108" y="112" width="144" height="44" rx="22" fill="rgba(99,102,241,0.18)" stroke="rgba(165,180,252,0.32)"/>
+  <text x="180" y="140" fill="#C7D2FE" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="600" text-anchor="middle">Verified pricing intelligence</text>
+  <text x="108" y="230" fill="#E5EEFC" font-family="Inter, Arial, sans-serif" font-size="62" font-weight="700">LLM Cost Intelligence</text>
+  <text x="108" y="298" fill="#E5EEFC" font-family="Inter, Arial, sans-serif" font-size="62" font-weight="700">Studio</text>
+  <text x="108" y="362" fill="#8FA3C7" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="500">Plan, compare, route, optimize, and forecast</text>
+  <text x="108" y="402" fill="#8FA3C7" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="500">AI model costs across the leading providers.</text>
+
+  <rect x="108" y="460" width="226" height="48" rx="24" fill="rgba(34,197,94,0.12)" stroke="rgba(74,222,128,0.24)"/>
+  <text x="221" y="490" fill="#BBF7D0" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="600" text-anchor="middle">Multi-provider routing</text>
+
+  <rect x="352" y="460" width="214" height="48" rx="24" fill="rgba(34,211,238,0.10)" stroke="rgba(34,211,238,0.24)"/>
+  <text x="459" y="490" fill="#CFFAFE" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="600" text-anchor="middle">Source-linked pricing</text>
+
+  <rect x="584" y="460" width="190" height="48" rx="24" fill="rgba(99,102,241,0.14)" stroke="rgba(129,140,248,0.28)"/>
+  <text x="679" y="490" fill="#E0E7FF" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="600" text-anchor="middle">Forecast-ready</text>
+
+  <g>
+    <rect x="805" y="141" width="259" height="120" rx="24" fill="rgba(15,23,42,0.92)" stroke="rgba(148,163,184,0.12)"/>
+    <text x="837" y="184" fill="#8FA3C7" font-family="Inter, Arial, sans-serif" font-size="20">Blended recurring/request</text>
+    <text x="837" y="234" fill="#E5EEFC" font-family="Inter, Arial, sans-serif" font-size="42" font-weight="700">$0.0084</text>
+  </g>
+  <g>
+    <rect x="805" y="282" width="259" height="94" rx="24" fill="rgba(15,23,42,0.92)" stroke="rgba(148,163,184,0.12)"/>
+    <text x="837" y="323" fill="#8FA3C7" font-family="Inter, Arial, sans-serif" font-size="20">Verified providers</text>
+    <text x="837" y="360" fill="#E5EEFC" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="700">6 / 6</text>
+  </g>
+  <g>
+    <rect x="805" y="396" width="259" height="118" rx="24" fill="rgba(15,23,42,0.92)" stroke="rgba(148,163,184,0.12)"/>
+    <text x="837" y="436" fill="#8FA3C7" font-family="Inter, Arial, sans-serif" font-size="20">Planning stack</text>
+    <text x="837" y="472" fill="#E5EEFC" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="700">Router + Default + Premium</text>
+    <text x="837" y="503" fill="#8FA3C7" font-family="Inter, Arial, sans-serif" font-size="18">How real AI products actually ship</text>
+  </g>
+
+  <defs>
+    <radialGradient id="bgGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(600 0) rotate(90) scale(630 843.278)">
+      <stop stop-color="#16213B"/>
+      <stop offset="1" stop-color="#08111F"/>
+    </radialGradient>
+    <radialGradient id="leftGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(187 133) rotate(90) scale(210)">
+      <stop stop-color="#6366F1" stop-opacity="0.32"/>
+      <stop offset="1" stop-color="#6366F1" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="rightGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1020 156) rotate(90) scale(180)">
+      <stop stop-color="#22D3EE" stop-opacity="0.24"/>
+      <stop offset="1" stop-color="#22D3EE" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+</svg>
