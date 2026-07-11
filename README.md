@@ -41,3 +41,8 @@ The long-term goal is to help teams answer questions like:
 ## License
 
 MIT.
+
+
+## Contributing
+
+Issues and small docs/PRs are welcome.
