@@ -36,3 +36,8 @@ The long-term goal is to help teams answer questions like:
 
 - GitHub Pages is configured through `.github/workflows/deploy-pages.yml`
 - every push to `main` builds and deploys the app automatically
+
+
+## License
+
+MIT.
