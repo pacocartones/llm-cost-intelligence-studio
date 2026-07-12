@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import './styles/global.css'
 import './App.css'
+import { Icons } from './components/Icons'
 import { ModelPicker } from './components/ModelPicker'
 import { RecentScenarios } from './components/RecentScenarios'
 import { SectionNav } from './components/SectionNav'
@@ -376,7 +378,7 @@ function App() {
         <header className="topbar">
           <div className="topbar-main">
             <p className="eyebrow">Verified pricing intelligence</p>
-            <h1>LLM Cost Intelligence Studio</h1>
+            <h1 className="gradient-text">LLM Cost Intelligence Studio</h1>
             <p className="hero-copy">
               A multi-provider workspace for planning AI economics across Anthropic,
               OpenAI, Gemini, Mistral, xAI, and DeepSeek with source-linked pricing,
@@ -404,7 +406,7 @@ function App() {
           </div>
           <div className="topbar-card">
             <span>Current planning stack</span>
-            <strong>{selectedModel.name}</strong>
+            <strong className="gradient-text">{selectedModel.name}</strong>
             <small>{selectedProvider.name}</small>
             <div className="topbar-card__metrics">
               <div>
@@ -574,8 +576,19 @@ function App() {
               Product planning for AI economics: estimate, compare, route, optimize, and
               forecast across multiple model providers.
             </p>
+            <div className="site-footer__socials">
+              <a href={repoUrl} target="_blank" rel="noreferrer" title="GitHub">
+                {Icons.external}
+                <span>GitHub</span>
+              </a>
+              <a href={liveDemoUrl} target="_blank" rel="noreferrer" title="Live demo">
+                {Icons.zap}
+                <span>Demo</span>
+              </a>
+            </div>
           </div>
           <div className="site-footer__links">
+            <strong className="text-label">Product</strong>
             <a href={liveDemoUrl} target="_blank" rel="noreferrer">
               Live demo
             </a>
@@ -587,6 +600,7 @@ function App() {
             </a>
           </div>
           <div className="site-footer__meta">
+            <strong className="text-label">Stats</strong>
             <span>{catalogHealth.verifiedProviders} verified providers</span>
             <span>{catalogHealth.verifiedModels} verified models</span>
             <span>Token economics first, infra costs next</span>

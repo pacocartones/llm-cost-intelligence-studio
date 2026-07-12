@@ -303,6 +303,7 @@ export function PlanScreen({
               checked={scenario.useCaching}
               onChange={(event) => onScenarioChange({ useCaching: event.target.checked })}
             />
+            <span className="toggle-switch"><span className="toggle-track" /></span>
             Model recurring traffic with cache reads
           </label>
           <label className="toggle-pill">
@@ -311,6 +312,7 @@ export function PlanScreen({
               checked={scenario.useBatch}
               onChange={(event) => onScenarioChange({ useBatch: event.target.checked })}
             />
+            <span className="toggle-switch"><span className="toggle-track" /></span>
             Assume batch discount for asynchronous jobs
           </label>
         </div>
@@ -319,7 +321,7 @@ export function PlanScreen({
       <aside className="sticky-rail">
         <section className="hero-panel">
           <p className="eyebrow">Live estimate</p>
-          <h2>{model.name}</h2>
+          <h2 className="gradient-text">{model.name}</h2>
           <div className="hero-metric">${cost.totalRecurring.toFixed(4)}</div>
           <p className="hero-subtitle">Recurring cost per request</p>
           <div className="sub-metric">
