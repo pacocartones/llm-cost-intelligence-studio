@@ -39,6 +39,11 @@ export function RecentScenarios({ scenarios, onLoad }: RecentScenariosProps) {
               <p>
                 {entry.providerId} · {entry.modelId}
               </p>
+              <div className="scenario-item__meta">
+                <span>{entry.scenario.requestsPerDay.toLocaleString()} req/day</span>
+                <span>{entry.scenario.outputTokens.toLocaleString()} output tok</span>
+                <span>{entry.scenario.activeUsers.toLocaleString()} users</span>
+              </div>
             </div>
             <span>{new Date(entry.createdAt).toLocaleDateString()}</span>
           </button>

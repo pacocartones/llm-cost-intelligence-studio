@@ -13,6 +13,11 @@ const postureOptions: { id: GrowthPosture; label: string; multiplier: number }[]
 
 const PROJECTION_HORIZON = 12
 
+function formatCompactMoney(value: number) {
+  if (value >= 1000) return `$${(value / 1000).toFixed(1)}k`
+  return `$${value.toFixed(0)}`
+}
+
 interface ForecastScreenProps {
   scenario: ScenarioInput
   cost: CostBreakdown
@@ -46,6 +51,65 @@ export function ForecastScreen({ scenario, cost }: ForecastScreenProps) {
   const month3 = projections[2]
   const month6 = projections[5]
   const month12 = projections[11]
+  const overrunMonth = projections.find((projection) => projection.cost > finance.monthlyBudget)
+  const maxProjectedCost = projections.reduce(
+    (largest, projection) => Math.max(largest, projection.cost),
+    cost.monthlyRecurring || 1,
+  )
+  const budgetReachRequests =
+    cost.totalRecurring > 0
+      ? Math.floor(finance.monthlyBudget / cost.totalRecurring)
+      : 0
+  const budgetUtilization =
+    finance.monthlyBudget > 0 ? (margin.monthlyTotal / finance.monthlyBudget) * 100 : 0
+  const outputShare =
+    cost.totalRecurring > 0 ? (cost.outputCost / cost.totalRecurring) * 100 : 0
+  const scenarioPressureCards = [
+    {
+      label: 'Monthly baseline',
+      value: formatCompactMoney(cost.monthlyRecurring),
+      detail: `${scenario.requestsPerDay.toLocaleString()} requests/day at the current shape`,
+    },
+    {
+      label: 'Budget pressure',
+      value: `${Math.round(budgetUtilization)}%`,
+      detail: overrunMonth
+        ? `At this trajectory the budget breaks in month ${overrunMonth.month}`
+        : 'Still inside budget across the current 12-month view',
+    },
+    {
+      label: 'Output sensitivity',
+      value: `${Math.round(outputShare)}%`,
+      detail: 'Share of recurring request cost driven by generated output',
+    },
+    {
+      label: 'Budget capacity',
+      value: budgetReachRequests > 0 ? budgetReachRequests.toLocaleString() : '—',
+      detail: 'Maximum monthly requests at the current recurring request cost',
+    },
+  ]
+  const projectionSnapshots = [
+    {
+      label: 'Month 1',
+      cost: projections[0]?.cost ?? cost.monthlyRecurring,
+      narrative: 'Where the current launch assumption starts.',
+    },
+    {
+      label: 'Month 3',
+      cost: month3.cost,
+      narrative: 'Useful for early go-to-market and staffing planning.',
+    },
+    {
+      label: 'Month 6',
+      cost: month6.cost,
+      narrative: 'A good checkpoint for changing default model policy.',
+    },
+    {
+      label: 'Month 12',
+      cost: month12.cost,
+      narrative: 'End-of-year pressure if growth compounds as modeled.',
+    },
+  ]
 
   return (
     <section className="panel">
@@ -54,6 +118,16 @@ export function ForecastScreen({ scenario, cost }: ForecastScreenProps) {
           <p className="eyebrow">Forecast</p>
           <h2>Translate request economics into product economics</h2>
         </div>
+      </div>
+
+      <div className="forecast-command-grid">
+        {scenarioPressureCards.map((card) => (
+          <article key={card.label} className="forecast-command-card">
+            <span>{card.label}</span>
+            <strong>{card.value}</strong>
+            <p>{card.detail}</p>
+          </article>
+        ))}
       </div>
 
       {/* Budget guardrail banner */}
@@ -76,6 +150,61 @@ export function ForecastScreen({ scenario, cost }: ForecastScreenProps) {
           <span>{margin.headroomPercent.toFixed(0)}%</span>
         </div>
       </div>
+
+      <section className="forecast-storyboard">
+        <div className="forecast-storyboard__main">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">Trajectory map</p>
+              <h3>Watch the budget break before it happens</h3>
+            </div>
+          </div>
+          <div className="trajectory-stack">
+            {projectionSnapshots.map((snapshot) => (
+              <article key={snapshot.label} className="trajectory-card">
+                <div className="trajectory-card__header">
+                  <span>{snapshot.label}</span>
+                  <strong>{formatCompactMoney(snapshot.cost)}</strong>
+                </div>
+                <div className="trajectory-bar">
+                  <div
+                    className="trajectory-bar__fill"
+                    style={{
+                      width: `${Math.max((snapshot.cost / maxProjectedCost) * 100, 12)}%`,
+                    }}
+                  />
+                </div>
+                <p>{snapshot.narrative}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+        <div className="forecast-storyboard__side">
+          <article className="forecast-outcome-card">
+            <span>Budget break point</span>
+            <strong>{overrunMonth ? `Month ${overrunMonth.month}` : 'No break in horizon'}</strong>
+            <p>
+              {overrunMonth
+                ? `${formatCompactMoney(overrunMonth.cost)} projected spend at the first overrun point.`
+                : 'The current budget still contains the scenario through month 12.'}
+            </p>
+          </article>
+          <article className="forecast-outcome-card">
+            <span>Annualized from today</span>
+            <strong>{formatCompactMoney(cost.monthlyRecurring * 12)}</strong>
+            <p>Useful as a fast finance-side translation of the current plan.</p>
+          </article>
+          <article className="forecast-outcome-card">
+            <span>Best lever to pull</span>
+            <strong>{outputShare >= 45 ? 'Trim outputs' : 'Tighten growth assumptions'}</strong>
+            <p>
+              {outputShare >= 45
+                ? 'This scenario is output-heavy, so answer length discipline will change the curve quickly.'
+                : 'The spend curve is more sensitive to traffic growth than to token mix right now.'}
+            </p>
+          </article>
+        </div>
+      </section>
 
       {/* Assumptions controls */}
       <div className="forecast-controls">

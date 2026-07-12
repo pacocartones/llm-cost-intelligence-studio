@@ -182,13 +182,62 @@ function App() {
       return [...templateItems, ...stackItems]
     },
     [
-      models,
       savedRoutingStacks,
       selectedTemplateIds,
       selectedStackIds,
       teamMultiplier,
     ],
   )
+  const totalRequestTokens = currentCost.inputTokens + scenario.outputTokens
+  const outputShare =
+    totalRequestTokens > 0 ? scenario.outputTokens / totalRequestTokens : 0
+  const cacheCoverage =
+    currentCost.inputTokens > 0
+      ? Math.min(1, scenario.cachedTokens / currentCost.inputTokens)
+      : 0
+  const scenarioRiskScore = Math.min(
+    99,
+    Math.round(
+      outputShare * 38 +
+        (scenario.requestsPerDay >= 5000 ? 18 : scenario.requestsPerDay >= 1500 ? 10 : 4) +
+        (scenario.retrievedTokens > scenario.userTokens ? 14 : 6) +
+        (scenario.useCaching ? -8 : scenario.cachedTokens > 0 ? 12 : 4) +
+        (alternativeModel ? 10 : 0),
+    ),
+  )
+  const scenarioRiskLabel =
+    scenarioRiskScore >= 60
+      ? 'Volatile spend profile'
+      : scenarioRiskScore >= 35
+        ? 'Watch growth drivers'
+        : 'Healthy baseline'
+  const monthlySavingsOpportunity = alternativeModel
+    ? Math.max(0, currentCost.monthlyRecurring - alternativeModel.recurring * scenario.requestsPerDay * scenario.daysPerMonth)
+    : 0
+  const commandCenterCards = [
+    {
+      label: 'Default model now',
+      value: selectedModel.name,
+      detail: `${selectedProvider.name} · $${currentCost.monthlyRecurring.toFixed(0)}/mo modeled`,
+    },
+    {
+      label: 'Cheapest fit',
+      value: cheapestScenarioModel.model.name,
+      detail: `$${cheapestScenarioModel.monthly.toFixed(0)}/mo floor for this workload`,
+    },
+    {
+      label: 'Savings unlocked',
+      value: alternativeModel ? `$${monthlySavingsOpportunity.toFixed(0)}/mo` : 'No obvious switch',
+      detail: alternativeModel
+        ? `${alternativeModel.model.name} is currently cheaper than your selected model`
+        : 'The current model is already close to the scenario floor',
+    },
+    {
+      label: 'Scenario pressure',
+      value: `${scenarioRiskScore}/99`,
+      detail: `${scenarioRiskLabel} · ${Math.round(cacheCoverage * 100)}% cacheable input`,
+    },
+  ]
 
   const repoUrl = 'https://github.com/pacocartones/llm-cost-intelligence-studio'
   const liveDemoUrl = 'https://pacocartones.github.io/llm-cost-intelligence-studio/'
@@ -473,6 +522,51 @@ function App() {
             <strong>${costPer1kRequests.toFixed(2)}</strong>
             <small>Useful for pricing your own product tiers and margins</small>
           </article>
+        </section>
+
+        <section className="command-center">
+          <div className="command-center__header">
+            <div>
+              <p className="eyebrow">Decision cockpit</p>
+              <h2>Read the decision before you dive into the controls</h2>
+            </div>
+            <p className="command-center__copy">
+              This layer turns the workspace into a quick executive readout:
+              what to ship now, what costs most, and where the next savings are.
+            </p>
+          </div>
+          <div className="command-center__grid">
+            {commandCenterCards.map((card) => (
+              <article key={card.label} className="command-card">
+                <span>{card.label}</span>
+                <strong>{card.value}</strong>
+                <p>{card.detail}</p>
+              </article>
+            ))}
+          </div>
+          <div className="command-center__actions">
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => setActiveView('plan')}
+            >
+              Tune scenario inputs
+            </button>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => setActiveView('compare')}
+            >
+              Review routing options
+            </button>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => setActiveView('forecast')}
+            >
+              Stress-test growth
+            </button>
+          </div>
         </section>
 
         <SectionNav activeView={activeView} onChange={setActiveView} />

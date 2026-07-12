@@ -4,6 +4,11 @@ import type { ModelRecord, UseCaseTemplate } from '../types/domain'
 
 type ExploreFilter = 'all' | 'starter' | 'growth' | 'serious'
 
+function formatCompactMoney(value: number) {
+  if (value >= 1000) return `$${(value / 1000).toFixed(1)}k`
+  return `$${value.toFixed(0)}`
+}
+
 interface ExploreScreenProps {
   templates: UseCaseTemplate[]
   models: ModelRecord[]
@@ -126,6 +131,35 @@ export function ExploreScreen({
     [models, selectedBenchmark],
   )
   const benchmarkLeader = benchmarkRanking[0]
+  const benchmarkRunnerUp = benchmarkRanking[1]
+  const categoryCount = new Set(templates.map((template) => template.category)).size
+  const exploreCards = [
+    {
+      label: 'Pattern library',
+      value: `${templates.length} templates`,
+      detail: `${categoryCount} product categories already mapped into the workspace`,
+    },
+    {
+      label: 'Provider coverage',
+      value: `${referencedProviderCount} providers`,
+      detail: 'Useful for comparing not just models, but default product strategies',
+    },
+    {
+      label: 'Current benchmark leader',
+      value: benchmarkLeader?.model.name ?? 'No leader yet',
+      detail: benchmarkLeader
+        ? `${benchmarkLeader.score.overall} overall score on the selected pack`
+        : 'Pick a benchmark pack to simulate model fit',
+    },
+    {
+      label: 'Budget lane in view',
+      value:
+        filter === 'all'
+          ? 'All bands'
+          : `${filter.charAt(0).toUpperCase()}${filter.slice(1)} lane`,
+      detail: `${visibleTemplates.length} visible templates in the current filter`,
+    },
+  ]
 
   return (
     <section className="panel">
@@ -134,6 +168,16 @@ export function ExploreScreen({
           <p className="eyebrow">Explore</p>
           <h2>What can you build with this product?</h2>
         </div>
+      </div>
+
+      <div className="explore-command-grid">
+        {exploreCards.map((card) => (
+          <article key={card.label} className="explore-command-card">
+            <span>{card.label}</span>
+            <strong>{card.value}</strong>
+            <p>{card.detail}</p>
+          </article>
+        ))}
       </div>
 
       <div className="explore-hero">
@@ -304,6 +348,61 @@ export function ExploreScreen({
                 <p>{score.summary}</p>
               </article>
             ))}
+          </div>
+        </section>
+      ) : null}
+
+      {selectedBenchmark && benchmarkLeader ? (
+        <section className="pattern-lab">
+          <div className="pattern-lab__main">
+            <div className="panel-heading">
+              <div>
+                <p className="eyebrow">Pattern lab</p>
+                <h3>What this benchmark is really testing</h3>
+              </div>
+            </div>
+            <div className="pattern-lab__cards">
+              <article className="pattern-card pattern-card--lead">
+                <span>Primary stressor</span>
+                <strong>{selectedBenchmark.stressor}</strong>
+                <p>{selectedBenchmark.successMetric}</p>
+              </article>
+              <article className="pattern-card">
+                <span>Top fit</span>
+                <strong>{benchmarkLeader.model.name}</strong>
+                <p>{benchmarkLeader.score.summary}</p>
+              </article>
+              <article className="pattern-card">
+                <span>Runner-up</span>
+                <strong>{benchmarkRunnerUp?.model.name ?? 'No challenger yet'}</strong>
+                <p>
+                  {benchmarkRunnerUp
+                    ? `${benchmarkRunnerUp.score.overall} score · ${formatCompactMoney(
+                        benchmarkRunnerUp.score.monthly,
+                      )}/mo in this pattern`
+                    : 'A second model will appear here once the pack has enough candidates.'}
+                </p>
+              </article>
+            </div>
+          </div>
+          <div className="pattern-lab__side">
+            <article className="pattern-outcome-card">
+              <span>Best use of this pack</span>
+              <strong>Choose defaults before launch</strong>
+              <p>
+                Treat these packs as pre-built product situations, not demos. The goal is to
+                pressure-test model policy early.
+              </p>
+            </article>
+            <article className="pattern-outcome-card">
+              <span>Next decision</span>
+              <strong>{benchmarkLeader.model.tier === 'flagship' ? 'Test routing' : 'Load template'}</strong>
+              <p>
+                {benchmarkLeader.model.tier === 'flagship'
+                  ? 'A flagship leader often means the next question is where to reserve it rather than whether to use it everywhere.'
+                  : 'A non-flagship leader is a strong signal that this workload can scale efficiently with the right defaults.'}
+              </p>
+            </article>
           </div>
         </section>
       ) : null}

@@ -10,6 +10,62 @@ import type { Insight } from '../lib/insights'
 import { buildTokenSlices, describeScenarioShape } from '../lib/scenario-shape'
 import { ShareButton } from '../components/ShareButton'
 
+const quickScenarioRecipes: Array<{
+  id: string
+  label: string
+  description: string
+  patch: Partial<ScenarioInput>
+}> = [
+  {
+    id: 'support',
+    label: 'Lean support copilot',
+    description: 'High volume, short answers, strong fit for caching and cheap defaults.',
+    patch: {
+      requestsPerDay: 3200,
+      activeUsers: 1400,
+      systemTokens: 650,
+      userTokens: 520,
+      retrievedTokens: 280,
+      toolTokens: 120,
+      cachedTokens: 500,
+      outputTokens: 260,
+      useCaching: true,
+    },
+  },
+  {
+    id: 'research',
+    label: 'Retrieval analyst',
+    description: 'Document-heavy prompts where context cost and long sessions dominate.',
+    patch: {
+      requestsPerDay: 900,
+      activeUsers: 240,
+      systemTokens: 900,
+      userTokens: 800,
+      retrievedTokens: 2800,
+      toolTokens: 350,
+      cachedTokens: 750,
+      outputTokens: 620,
+      useCaching: true,
+    },
+  },
+  {
+    id: 'generator',
+    label: 'Content generator',
+    description: 'Output-heavy workflow where every extra answer token matters.',
+    patch: {
+      requestsPerDay: 1800,
+      activeUsers: 520,
+      systemTokens: 550,
+      userTokens: 700,
+      retrievedTokens: 180,
+      toolTokens: 120,
+      cachedTokens: 180,
+      outputTokens: 1500,
+      useCaching: false,
+    },
+  },
+]
+
 interface PlanScreenProps {
   provider: Provider
   model: ModelRecord
@@ -74,6 +130,49 @@ export function PlanScreen({
   const monthlyRequests = scenario.requestsPerDay * scenario.daysPerMonth
   const annualizedRunRate = cost.monthlyRecurring * 12
   const planningNarrative = getPlanningNarrative(scenarioShape, provider, model)
+  const totalRequestTokens = cost.inputTokens + scenario.outputTokens
+  const monthlyTokenVolume = totalRequestTokens * monthlyRequests
+  const cacheCoverage =
+    cost.inputTokens > 0 ? Math.min(1, scenario.cachedTokens / cost.inputTokens) : 0
+  const outputShare =
+    totalRequestTokens > 0 ? scenario.outputTokens / totalRequestTokens : 0
+  const dominantSlice =
+    tokenSlices.length > 0
+      ? [...tokenSlices].sort((left, right) => right.tokens - left.tokens)[0]
+      : null
+  const builderStages = [
+    {
+      label: 'Traffic',
+      value: `${scenario.requestsPerDay.toLocaleString()}/day`,
+      detail:
+        scenario.requestsPerDay >= 5000
+          ? 'Scaled production lane'
+          : scenario.requestsPerDay >= 1500
+            ? 'Growing product lane'
+            : 'Pilot traffic lane',
+    },
+    {
+      label: 'Prompt shape',
+      value: scenarioShape,
+      detail: dominantSlice ? `${dominantSlice.label} is the largest bucket` : 'No token mix yet',
+    },
+    {
+      label: 'Output policy',
+      value: `${Math.round(outputShare * 100)}% output share`,
+      detail:
+        outputShare >= 0.4
+          ? 'Answer length is a major spend driver'
+          : 'Output length is still under control',
+    },
+    {
+      label: 'Efficiency',
+      value: scenario.useCaching ? 'Caching on' : 'Caching off',
+      detail: `${Math.round(cacheCoverage * 100)}% of input is cacheable today`,
+    },
+  ]
+  const nextMove = alternativeModel
+    ? `Switching to ${alternativeModel.name} or using it in a routing mix is the fastest near-term savings move.`
+    : 'The fastest win is now architectural: tighten outputs, batch async flows, or increase cache reuse.'
 
   return (
     <div className="screen-grid">
@@ -140,6 +239,63 @@ export function PlanScreen({
           </div>
         </div>
 
+        <div className="builder-stage-grid">
+          {builderStages.map((stage) => (
+            <article key={stage.label} className="builder-stage-card">
+              <span>{stage.label}</span>
+              <strong>{stage.value}</strong>
+              <p>{stage.detail}</p>
+            </article>
+          ))}
+        </div>
+
+        <div className="scenario-cockpit-grid">
+          <article className="scenario-cockpit-card scenario-cockpit-card--hero">
+            <span>Cost pressure now</span>
+            <strong>${cost.monthlyRecurring.toFixed(0)}/mo</strong>
+            <p>{nextMove}</p>
+          </article>
+          <article className="scenario-cockpit-card">
+            <span>Monthly token volume</span>
+            <strong>{monthlyTokenVolume.toLocaleString()}</strong>
+            <p>Useful for spotting when a small prompt increase becomes a real budget issue.</p>
+          </article>
+          <article className="scenario-cockpit-card">
+            <span>Dominant spend lever</span>
+            <strong>{dominantSlice?.label ?? 'No driver yet'}</strong>
+            <p>
+              {dominantSlice
+                ? `${dominantSlice.percentage.toFixed(0)}% of the request shape today.`
+                : 'Start filling in token inputs to reveal cost pressure.'}
+            </p>
+          </article>
+        </div>
+
+        <div className="recipe-heading">
+          <div>
+            <p className="eyebrow">Quick scenario recipes</p>
+            <h3>Jump to a realistic operating pattern</h3>
+          </div>
+          <p className="muted-copy">
+            These are lighter-weight than templates. Use them when you want to
+            reshape the workload quickly without leaving the planning surface.
+          </p>
+        </div>
+
+        <div className="recipe-grid">
+          {quickScenarioRecipes.map((recipe) => (
+            <button
+              key={recipe.id}
+              type="button"
+              className="recipe-card"
+              onClick={() => onScenarioChange(recipe.patch)}
+            >
+              <strong>{recipe.label}</strong>
+              <p>{recipe.description}</p>
+            </button>
+          ))}
+        </div>
+
         <div className="field-grid">
           <label>
             Scenario name
@@ -182,6 +338,77 @@ export function PlanScreen({
               }
             />
           </label>
+        </div>
+
+        <div className="scenario-dial-grid">
+          <article className="dial-card">
+            <div className="dial-card__header">
+              <span>Requests per day</span>
+              <strong>{scenario.requestsPerDay.toLocaleString()}</strong>
+            </div>
+            <input
+              type="range"
+              min="100"
+              max="15000"
+              step="100"
+              value={Math.min(scenario.requestsPerDay, 15000)}
+              onChange={(event) =>
+                onScenarioChange({ requestsPerDay: Number(event.target.value) || 0 })
+              }
+            />
+            <p>Use this as the first stress lever before changing model selection.</p>
+          </article>
+          <article className="dial-card">
+            <div className="dial-card__header">
+              <span>Active users</span>
+              <strong>{scenario.activeUsers.toLocaleString()}</strong>
+            </div>
+            <input
+              type="range"
+              min="50"
+              max="10000"
+              step="50"
+              value={Math.min(scenario.activeUsers, 10000)}
+              onChange={(event) =>
+                onScenarioChange({ activeUsers: Number(event.target.value) || 0 })
+              }
+            />
+            <p>Helps frame per-user economics, support tiers, and premium packaging.</p>
+          </article>
+          <article className="dial-card">
+            <div className="dial-card__header">
+              <span>Output tokens</span>
+              <strong>{scenario.outputTokens.toLocaleString()}</strong>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="4000"
+              step="25"
+              value={Math.min(scenario.outputTokens, 4000)}
+              onChange={(event) =>
+                onScenarioChange({ outputTokens: Number(event.target.value) || 0 })
+              }
+            />
+            <p>Usually the fastest hidden driver when teams feel spend drifting upward.</p>
+          </article>
+          <article className="dial-card">
+            <div className="dial-card__header">
+              <span>Cached prefix tokens</span>
+              <strong>{scenario.cachedTokens.toLocaleString()}</strong>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="3000"
+              step="25"
+              value={Math.min(scenario.cachedTokens, 3000)}
+              onChange={(event) =>
+                onScenarioChange({ cachedTokens: Number(event.target.value) || 0 })
+              }
+            />
+            <p>Great for modeling shared system prompts, reusable instructions, and stable context.</p>
+          </article>
         </div>
 
         <div className="micro-metrics">

@@ -12,6 +12,11 @@ import type {
   ShareableArtifact,
 } from '../types/domain'
 
+function formatCompactMoney(value: number) {
+  if (value >= 1000) return `$${(value / 1000).toFixed(1)}k`
+  return `$${value.toFixed(0)}`
+}
+
 interface PortfolioScreenProps {
   templates: UseCaseTemplate[]
   models: ModelRecord[]
@@ -144,6 +149,39 @@ export function PortfolioScreen({
     finance.monthlyBudget > 0
       ? ((finance.monthlyBudget - totalMonthly) / finance.monthlyBudget) * 100
       : 0
+  const allocationItems = [...allPortfolioItems].sort((left, right) => right.monthly - left.monthly)
+  const concentrationShare =
+    totalMonthly > 0 ? ((highestBurnItem.monthly ?? 0) / totalMonthly) * 100 : 0
+  const portfolioPosture =
+    impliedMargin < 0
+      ? 'Over-allocated'
+      : impliedMargin < finance.targetMarginPercent
+        ? 'Margin below target'
+        : impliedMargin < finance.targetMarginPercent + 15
+          ? 'Tight but workable'
+          : 'Healthy allocation'
+  const executiveCards = [
+    {
+      label: 'Portfolio posture',
+      value: portfolioPosture,
+      detail: `${Math.abs(impliedMargin).toFixed(1)}% implied margin against the current budget`,
+    },
+    {
+      label: 'Largest capital draw',
+      value: highestBurnItem.label,
+      detail: `${formatCompactMoney(highestBurnItem.monthly)} monthly · ${concentrationShare.toFixed(0)}% of total`,
+    },
+    {
+      label: 'Active bets',
+      value: `${allPortfolioItems.length}`,
+      detail: `${selectedTemplateIds.length} templates + ${selectedStackIds.length} routing deployments selected`,
+    },
+    {
+      label: 'Annual exposure',
+      value: formatCompactMoney(totalAnnual),
+      detail: 'Useful for budget reviews, hiring plans, and infrastructure commitment',
+    },
+  ]
 
   function toggleTemplate(id: string) {
     setSelectedTemplateIds((current) =>
@@ -168,6 +206,16 @@ export function PortfolioScreen({
           <p className="eyebrow">Portfolio</p>
           <h2>Compare several products or teams at once</h2>
         </div>
+      </div>
+
+      <div className="portfolio-command-grid">
+        {executiveCards.map((card) => (
+          <article key={card.label} className="portfolio-command-card">
+            <span>{card.label}</span>
+            <strong>{card.value}</strong>
+            <p>{card.detail}</p>
+          </article>
+        ))}
       </div>
 
       {/* Portfolio totals */}
@@ -326,6 +374,78 @@ export function PortfolioScreen({
           </p>
         </div>
       ) : null}
+
+      <section className="allocation-board">
+        <div className="allocation-board__main">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">Allocation map</p>
+              <h3>See where the portfolio is actually spending money</h3>
+            </div>
+          </div>
+          <div className="allocation-stack">
+            {!allocationItems.length ? (
+              <article className="allocation-item">
+                <div className="allocation-item__meta">
+                  <div>
+                    <strong>No portfolio items selected yet</strong>
+                    <p>Select templates or routing stacks to build the board.</p>
+                  </div>
+                </div>
+              </article>
+            ) : null}
+            {allocationItems.map((item) => {
+              const share = totalMonthly > 0 ? (item.monthly / totalMonthly) * 100 : 0
+              return (
+                <article key={item.id} className="allocation-item">
+                  <div className="allocation-item__meta">
+                    <div>
+                      <strong>{item.label}</strong>
+                      <p>{item.type === 'stack' ? 'Routing stack' : item.owner}</p>
+                    </div>
+                    <div className="allocation-item__stats">
+                      <span>{share.toFixed(0)}% of portfolio</span>
+                      <strong>{formatCompactMoney(item.monthly)}</strong>
+                    </div>
+                  </div>
+                  <div className="allocation-item__bar">
+                    <div
+                      className="allocation-item__fill"
+                      style={{ width: `${Math.max(share, 8)}%` }}
+                    />
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="allocation-board__side">
+          <article className="allocation-outcome-card">
+            <span>Budget headroom</span>
+            <strong>{formatCompactMoney(Math.abs(margin.headroom))}</strong>
+            <p>
+              {margin.headroom >= 0
+                ? 'Remaining monthly room before you hit the current budget.'
+                : 'Monthly overrun that needs trimming or a larger spend ceiling.'}
+            </p>
+          </article>
+          <article className="allocation-outcome-card">
+            <span>Concentration risk</span>
+            <strong>{concentrationShare.toFixed(0)}%</strong>
+            <p>The share held by the single most expensive workload in the portfolio.</p>
+          </article>
+          <article className="allocation-outcome-card">
+            <span>Best next action</span>
+            <strong>{margin.overrunItems.length ? 'Trim top contributors' : 'Scale the best-fit bets'}</strong>
+            <p>
+              {margin.overrunItems.length
+                ? `${margin.overrunItems.join(', ')} should be reviewed first for routing or model changes.`
+                : 'The portfolio is still inside budget, so focus on the highest-confidence growth lanes.'}
+            </p>
+          </article>
+        </div>
+      </section>
 
       <div className="portfolio-selector-grid">
         <section className="panel compact nested">

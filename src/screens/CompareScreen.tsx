@@ -92,6 +92,11 @@ function getModeNarrative(mode: DecisionMode) {
   return 'Use this lens when you want the best overall product default rather than the absolute cheapest model.'
 }
 
+function formatMonthlyValue(value: number) {
+  if (value >= 1000) return `$${(value / 1000).toFixed(1)}k`
+  return `$${value.toFixed(0)}`
+}
+
 interface CompareScreenProps {
   models: ModelRecord[]
   scenario: ScenarioInput
@@ -152,6 +157,25 @@ export function CompareScreen({
 
   const routingBlueprint = buildRoutingMix(comparison, routingSlots)
   const savingsVsSelected = currentEntry.cost.totalRecurring - routingBlueprint.blendedRecurring
+  const maxRecurring = comparison.reduce(
+    (largest, entry) => Math.max(largest, entry.cost.totalRecurring),
+    0.0001,
+  )
+  const maxScore = comparison.reduce(
+    (largest, entry) => Math.max(largest, entry.score),
+    0.0001,
+  )
+  const winnerMonthlyDelta = currentEntry.cost.monthlyRecurring - winner.cost.monthlyRecurring
+  const growthPreview = [
+    { label: 'Now', multiplier: 1 },
+    { label: '2x traffic', multiplier: 2 },
+    { label: '5x traffic', multiplier: 5 },
+  ].map((entry) => ({
+    ...entry,
+    selected: currentEntry.cost.monthlyRecurring * entry.multiplier,
+    winner: winner.cost.monthlyRecurring * entry.multiplier,
+    routing: routingBlueprint.blendedMonthly * entry.multiplier,
+  }))
 
   const savedStackSummaries = useMemo(
     () =>
@@ -304,6 +328,89 @@ export function CompareScreen({
         </p>
       </div>
 
+      <section className="compare-lab">
+        <div className="compare-lab__main">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">Decision spectrum</p>
+              <h3>See the tradeoff, not just the winner</h3>
+            </div>
+          </div>
+          <div className="spectrum-stack">
+            {comparison.map((entry) => (
+              <article key={entry.model.id} className="spectrum-row">
+                <div className="spectrum-row__meta">
+                  <div>
+                    <strong>{entry.model.name}</strong>
+                    <p>{entry.model.summary}</p>
+                  </div>
+                  <div className="spectrum-row__values">
+                    <span>{formatMonthlyValue(entry.cost.monthlyRecurring)}</span>
+                    <small>{Math.round((entry.score / maxScore) * 100)} fit score</small>
+                  </div>
+                </div>
+                <div className="spectrum-row__bars">
+                  <div className="spectrum-bar">
+                    <div
+                      className="spectrum-bar__fill"
+                      style={{ width: `${Math.max((entry.cost.totalRecurring / maxRecurring) * 100, 10)}%` }}
+                    />
+                  </div>
+                  <div className="spectrum-score">
+                    <div
+                      className="spectrum-score__fill"
+                      style={{ width: `${Math.max((entry.score / maxScore) * 100, 8)}%` }}
+                    />
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+
+        <div className="compare-lab__side">
+          <article className="decision-outcome-card">
+            <span>Keep current</span>
+            <strong>{currentEntry.model.name}</strong>
+            <p>{formatMonthlyValue(currentEntry.cost.monthlyRecurring)} monthly at the modeled workload.</p>
+          </article>
+          <article className="decision-outcome-card decision-outcome-card--winner">
+            <span>Switch default</span>
+            <strong>{winner.model.name}</strong>
+            <p>
+              {winnerMonthlyDelta >= 0 ? 'Saves' : 'Adds'} {formatMonthlyValue(Math.abs(winnerMonthlyDelta))} per month right away.
+            </p>
+          </article>
+          <article className="decision-outcome-card">
+            <span>Route traffic</span>
+            <strong>{formatMonthlyValue(routingBlueprint.blendedMonthly)}</strong>
+            <p>Use a mix when one model is too expensive and one model is too limiting.</p>
+          </article>
+        </div>
+      </section>
+
+      <section className="growth-preview">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Growth preview</p>
+            <h3>What the decision looks like when usage climbs</h3>
+          </div>
+        </div>
+        <div className="growth-preview__grid">
+          {growthPreview.map((entry) => (
+            <article key={entry.label} className="growth-preview-card">
+              <span>{entry.label}</span>
+              <strong>{formatMonthlyValue(entry.selected)}</strong>
+              <p>
+                Current default. Winner: {formatMonthlyValue(entry.winner)}. Routing:
+                {' '}
+                {formatMonthlyValue(entry.routing)}.
+              </p>
+            </article>
+          ))}
+        </div>
+      </section>
+
       <section className="routing-panel">
         <div className="panel-heading">
           <div>
@@ -354,6 +461,32 @@ export function CompareScreen({
           <button type="button" className="text-link" onClick={normalizeRoutingShares}>
             Normalize to 100%
           </button>
+        </div>
+
+        <div className="mix-meter">
+          {routingBlueprint.stack.map((slot) => (
+            <div
+              key={slot.roleId}
+              className={`mix-meter__segment mix-meter__segment--${slot.roleId}`}
+              style={{ width: `${Math.max(slot.normalizedShare * 100, 8)}%` }}
+            >
+              <span>{slot.roleLabel}</span>
+              <strong>{Math.round(slot.normalizedShare * 100)}%</strong>
+            </div>
+          ))}
+        </div>
+
+        <div className="routing-architecture">
+          {routingBlueprint.stack.map((slot) => (
+            <article key={slot.roleId} className="routing-architecture__card">
+              <span>{slot.roleLabel}</span>
+              <strong>{slot.entry.model.name}</strong>
+              <p>{slot.note}</p>
+              <small>
+                {slot.share}% assigned · ${slot.entry.cost.totalRecurring.toFixed(4)} recurring
+              </small>
+            </article>
+          ))}
         </div>
 
         <div className="routing-grid">
@@ -542,6 +675,12 @@ export function CompareScreen({
                   {badge}
                 </span>
               ))}
+            </div>
+            <div className="compare-scorebar">
+              <div
+                className="compare-scorebar__fill"
+                style={{ width: `${Math.max((allEntries.find((entry) => entry.model.id === model.id)?.score ?? 0) / maxScore * 100, 8)}%` }}
+              />
             </div>
             <p className="compare-note">
               Best for {model.recommendedFor.slice(0, 2).join(' and ')}.
