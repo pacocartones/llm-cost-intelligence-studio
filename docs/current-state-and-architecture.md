@@ -4,7 +4,7 @@
 
 `LLM Cost Intelligence Studio` is live and deployed on GitHub Pages:
 
-- `https://pacocartones.github.io/LLM-Cost-Intelligence-Studio/`
+- `https://pacocartones.github.io/llm-cost-intelligence-studio/`
 
 It is no longer a starter or wireframe. It already behaves like a working product shell for multi-provider AI economics planning.
 

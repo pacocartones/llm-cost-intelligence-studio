@@ -6,7 +6,7 @@ It already has a live deployed product, verified pricing catalog coverage, saved
 
 Live demo:
 
-- `https://pacocartones.github.io/LLM-Cost-Intelligence-Studio/`
+- `https://pacocartones.github.io/llm-cost-intelligence-studio/`
 
 Use these files in this order with Claude Code:
 

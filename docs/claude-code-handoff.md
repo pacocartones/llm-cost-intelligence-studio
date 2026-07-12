@@ -37,8 +37,8 @@ The product should help a real team answer:
 
 ## Current live links
 
-- Repo: `https://github.com/pacocartones/LLM-Cost-Intelligence-Studio`
-- Live demo: `https://pacocartones.github.io/LLM-Cost-Intelligence-Studio/`
+- Repo: `https://github.com/pacocartones/llm-cost-intelligence-studio`
+- Live demo: `https://pacocartones.github.io/llm-cost-intelligence-studio/`
 
 ## Commands
 

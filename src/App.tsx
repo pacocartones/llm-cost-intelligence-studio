@@ -190,8 +190,8 @@ function App() {
     ],
   )
 
-  const repoUrl = 'https://github.com/pacocartones/LLM-Cost-Intelligence-Studio'
-  const liveDemoUrl = 'https://pacocartones.github.io/LLM-Cost-Intelligence-Studio/'
+  const repoUrl = 'https://github.com/pacocartones/llm-cost-intelligence-studio'
+  const liveDemoUrl = 'https://pacocartones.github.io/llm-cost-intelligence-studio/'
 
   const planShareArtifact: ShareableArtifact = {
     version: 1,
