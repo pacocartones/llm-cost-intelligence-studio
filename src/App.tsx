@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './styles/global.css'
 import './App.css'
 import { Icons } from './components/Icons'
@@ -34,14 +34,65 @@ import type {
 
 const savedScenariosKey = 'llm-cost-studio-scenarios'
 const savedRoutingStacksKey = 'llm-cost-studio-routing-stacks'
-const headerSections: { id: ViewId; label: string }[] = [
-  { id: 'plan', label: 'Plan' },
-  { id: 'compare', label: 'Compare' },
-  { id: 'optimize', label: 'Optimize' },
-  { id: 'explore', label: 'Explore' },
-  { id: 'forecast', label: 'Forecast' },
-  { id: 'portfolio', label: 'Portfolio' },
-]
+const viewSpotlights: Record<
+  ViewId,
+  {
+    label: string
+    kicker: string
+    description: string
+    nextLabel: string
+    nextView: ViewId
+  }
+> = {
+  plan: {
+    label: 'Plan',
+    kicker: 'Shape the workload',
+    description:
+      'Model a realistic scenario first so every later routing, savings, and finance decision has a trustworthy baseline.',
+    nextLabel: 'Compare model options',
+    nextView: 'compare',
+  },
+  compare: {
+    label: 'Compare',
+    kicker: 'Choose your default path',
+    description:
+      'Decide whether one model should stay in the main request path or whether a routing mix is the smarter default.',
+    nextLabel: 'Stress-test growth',
+    nextView: 'forecast',
+  },
+  optimize: {
+    label: 'Optimize',
+    kicker: 'Sequence the savings work',
+    description:
+      'Turn the estimate into an action queue so the team knows which cheap wins to ship before bigger architecture moves.',
+    nextLabel: 'Stress-test budget impact',
+    nextView: 'forecast',
+  },
+  explore: {
+    label: 'Explore',
+    kicker: 'Start from proven patterns',
+    description:
+      'Use pre-built product patterns and benchmark packs instead of inventing scenarios from scratch every time.',
+    nextLabel: 'Load a planning template',
+    nextView: 'plan',
+  },
+  forecast: {
+    label: 'Forecast',
+    kicker: 'Test budget and scale',
+    description:
+      'Project when the current plan breaks budget and whether growth, outputs, or model choice will hurt you first.',
+    nextLabel: 'Review portfolio exposure',
+    nextView: 'portfolio',
+  },
+  portfolio: {
+    label: 'Portfolio',
+    kicker: 'Allocate capital across bets',
+    description:
+      'See which workloads deserve budget, which ones dominate spend, and where concentration risk is starting to form.',
+    nextLabel: 'Return to scenario planning',
+    nextView: 'plan',
+  },
+}
 
 function loadSavedScenarios() {
   const raw = window.localStorage.getItem(savedScenariosKey)
@@ -66,6 +117,8 @@ function loadSavedRoutingStacks() {
 }
 
 function App() {
+  const workspaceAnchorRef = useRef<HTMLElement | null>(null)
+  const hasMountedRef = useRef(false)
   const [activeView, setActiveView] = useState<ViewId>('plan')
   const [selectedProviderId, setSelectedProviderId] =
     useState<ProviderId>('anthropic')
@@ -122,6 +175,18 @@ function App() {
       JSON.stringify(savedRoutingStacks),
     )
   }, [savedRoutingStacks])
+
+  useEffect(() => {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true
+      return
+    }
+
+    workspaceAnchorRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+  }, [activeView])
 
   const selectedModel =
     models.find((model) => model.id === selectedModelId) ?? models[0]
@@ -214,6 +279,11 @@ function App() {
   const monthlySavingsOpportunity = alternativeModel
     ? Math.max(0, currentCost.monthlyRecurring - alternativeModel.recurring * scenario.requestsPerDay * scenario.daysPerMonth)
     : 0
+  const activeViewSpotlight = viewSpotlights[activeView]
+  const showHomeScaffold = activeView === 'plan' && !shareData
+  const showModelPicker =
+    !shareData &&
+    ['plan', 'compare', 'optimize', 'forecast'].includes(activeView)
   const commandCenterCards = [
     {
       label: 'Default model now',
@@ -399,23 +469,13 @@ function App() {
             </span>
           </button>
 
-          <nav className="site-header__nav" aria-label="Site">
-            {headerSections.map((section) => (
-              <button
-                key={section.id}
-                type="button"
-                className={section.id === activeView ? 'active' : ''}
-                onClick={() => setActiveView(section.id)}
-              >
-                {section.label}
-              </button>
-            ))}
-          </nav>
+          <div className="site-header__status" aria-live="polite">
+            <span className="text-label">Current workspace</span>
+            <strong>{activeViewSpotlight.label}</strong>
+            <small>{activeViewSpotlight.kicker}</small>
+          </div>
 
           <div className="site-header__actions">
-            <a className="text-link" href={selectedProvider.sourceUrl} target="_blank" rel="noreferrer">
-              Pricing source
-            </a>
             <a className="ghost-button" href={repoUrl} target="_blank" rel="noreferrer">
               GitHub
             </a>
@@ -444,13 +504,17 @@ function App() {
               <button
                 type="button"
                 className="ghost-button"
-                onClick={() => setActiveView('compare')}
+                onClick={() => setActiveView('plan')}
               >
-                Build routing mix
+                Start scenario planning
               </button>
-              <a className="text-link" href={liveDemoUrl} target="_blank" rel="noreferrer">
-                Public demo
-              </a>
+              <button
+                type="button"
+                className="text-link"
+                onClick={() => setActiveView('explore')}
+              >
+                Explore product patterns
+              </button>
             </div>
           </div>
           <div className="topbar-card">
@@ -474,111 +538,149 @@ function App() {
           </div>
         </header>
 
-        <section className="overview-band">
-          <article className="overview-card">
-            <span>Catalog coverage</span>
-            <strong>{catalogHealth.modelCount}</strong>
-            <small>{providers.length} providers mapped into the workspace</small>
-          </article>
-          <article className="overview-card">
-            <span>Verified coverage</span>
-            <strong>{verifiedCoverage}%</strong>
-            <small>
-              {catalogHealth.verifiedModels} verified, {catalogHealth.mixedModels} mixed,
-              {catalogHealth.seedModels} seed
-            </small>
-          </article>
-          <article className="overview-card">
-            <span>Current monthly run-rate</span>
-            <strong>${currentCost.monthlyRecurring.toFixed(0)}</strong>
-            <small>{scenario.requestsPerDay.toLocaleString()} daily requests modeled</small>
-          </article>
-          <article className="overview-card">
-            <span>Scenario floor</span>
-            <strong>${cheapestScenarioModel.monthly.toFixed(0)}</strong>
-            <small>
-              {cheapestScenarioModel.model.name} is the cheapest fit for this workload
-            </small>
-          </article>
-        </section>
-
-        <section className="trust-band">
-          <article className="trust-card">
-            <span className="eyebrow">Catalog pulse</span>
-            <h3>Built to answer “which model should we ship?” not just “what does one prompt cost?”</h3>
-            <p>
-              Every provider card is linked to a primary pricing source, so the product can
-              evolve into a serious planning surface for routing, budgeting, and AI portfolio
-              decisions.
-            </p>
-          </article>
-          <article className="trust-card compact-stat">
-            <span>Cost per active user</span>
-            <strong>${costPerUser.toFixed(2)}</strong>
-            <small>{scenario.activeUsers.toLocaleString()} active users assumed</small>
-          </article>
-          <article className="trust-card compact-stat">
-            <span>Cost per 1k requests</span>
-            <strong>${costPer1kRequests.toFixed(2)}</strong>
-            <small>Useful for pricing your own product tiers and margins</small>
-          </article>
-        </section>
-
-        <section className="command-center">
-          <div className="command-center__header">
-            <div>
-              <p className="eyebrow">Decision cockpit</p>
-              <h2>Read the decision before you dive into the controls</h2>
-            </div>
-            <p className="command-center__copy">
-              This layer turns the workspace into a quick executive readout:
-              what to ship now, what costs most, and where the next savings are.
-            </p>
-          </div>
-          <div className="command-center__grid">
-            {commandCenterCards.map((card) => (
-              <article key={card.label} className="command-card">
-                <span>{card.label}</span>
-                <strong>{card.value}</strong>
-                <p>{card.detail}</p>
+        {showHomeScaffold ? (
+          <>
+            <section className="overview-band">
+              <article className="overview-card">
+                <span>Catalog coverage</span>
+                <strong>{catalogHealth.modelCount}</strong>
+                <small>{providers.length} providers mapped into the workspace</small>
               </article>
-            ))}
-          </div>
-          <div className="command-center__actions">
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={() => setActiveView('plan')}
-            >
-              Tune scenario inputs
-            </button>
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={() => setActiveView('compare')}
-            >
-              Review routing options
-            </button>
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={() => setActiveView('forecast')}
-            >
-              Stress-test growth
-            </button>
-          </div>
+              <article className="overview-card">
+                <span>Verified coverage</span>
+                <strong>{verifiedCoverage}%</strong>
+                <small>
+                  {catalogHealth.verifiedModels} verified, {catalogHealth.mixedModels} mixed,
+                  {catalogHealth.seedModels} seed
+                </small>
+              </article>
+              <article className="overview-card">
+                <span>Current monthly run-rate</span>
+                <strong>${currentCost.monthlyRecurring.toFixed(0)}</strong>
+                <small>{scenario.requestsPerDay.toLocaleString()} daily requests modeled</small>
+              </article>
+              <article className="overview-card">
+                <span>Scenario floor</span>
+                <strong>${cheapestScenarioModel.monthly.toFixed(0)}</strong>
+                <small>
+                  {cheapestScenarioModel.model.name} is the cheapest fit for this workload
+                </small>
+              </article>
+            </section>
+
+            <section className="trust-band">
+              <article className="trust-card">
+                <span className="eyebrow">Catalog pulse</span>
+                <h3>Built to answer “which model should we ship?” not just “what does one prompt cost?”</h3>
+                <p>
+                  Every provider card is linked to a primary pricing source, so the product can
+                  evolve into a serious planning surface for routing, budgeting, and AI portfolio
+                  decisions.
+                </p>
+              </article>
+              <article className="trust-card compact-stat">
+                <span>Cost per active user</span>
+                <strong>${costPerUser.toFixed(2)}</strong>
+                <small>{scenario.activeUsers.toLocaleString()} active users assumed</small>
+              </article>
+              <article className="trust-card compact-stat">
+                <span>Cost per 1k requests</span>
+                <strong>${costPer1kRequests.toFixed(2)}</strong>
+                <small>Useful for pricing your own product tiers and margins</small>
+              </article>
+            </section>
+
+            <section className="command-center">
+              <div className="command-center__header">
+                <div>
+                  <p className="eyebrow">Decision cockpit</p>
+                  <h2>Read the decision before you dive into the controls</h2>
+                </div>
+                <p className="command-center__copy">
+                  This layer turns the workspace into a quick executive readout:
+                  what to ship now, what costs most, and where the next savings are.
+                </p>
+              </div>
+              <div className="command-center__grid">
+                {commandCenterCards.map((card) => (
+                  <article key={card.label} className="command-card">
+                    <span>{card.label}</span>
+                    <strong>{card.value}</strong>
+                    <p>{card.detail}</p>
+                  </article>
+                ))}
+              </div>
+              <div className="command-center__actions">
+                <button
+                  type="button"
+                  className="ghost-button"
+                  onClick={() => setActiveView('plan')}
+                >
+                  Tune scenario inputs
+                </button>
+                <button
+                  type="button"
+                  className="ghost-button"
+                  onClick={() => setActiveView('compare')}
+                >
+                  Review routing options
+                </button>
+                <button
+                  type="button"
+                  className="ghost-button"
+                  onClick={() => setActiveView('forecast')}
+                >
+                  Stress-test growth
+                </button>
+              </div>
+            </section>
+          </>
+        ) : null}
+
+        <section ref={workspaceAnchorRef} className="workspace-anchor">
+          <SectionNav activeView={activeView} onChange={setActiveView} />
+
+          {!shareData ? (
+            <section className="view-spotlight">
+              <div className="view-spotlight__copy">
+                <p className="eyebrow">{activeViewSpotlight.label}</p>
+                <h2>{activeViewSpotlight.kicker}</h2>
+                <p>{activeViewSpotlight.description}</p>
+              </div>
+              <div className="view-spotlight__meta">
+                <div>
+                  <span>Current model</span>
+                  <strong>{selectedModel.name}</strong>
+                </div>
+                <div>
+                  <span>Current provider</span>
+                  <strong>{selectedProvider.name}</strong>
+                </div>
+                <div>
+                  <span>Next useful move</span>
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={() => setActiveView(activeViewSpotlight.nextView)}
+                  >
+                    {activeViewSpotlight.nextLabel}
+                  </button>
+                </div>
+              </div>
+            </section>
+          ) : null}
+
+          {showModelPicker ? (
+            <ModelPicker
+              models={models}
+              providers={providers}
+              providerId={selectedProviderId}
+              selectedModelId={selectedModelId}
+              onProviderChange={setSelectedProviderId}
+              onModelChange={setSelectedModelId}
+            />
+          ) : null}
         </section>
-
-        <SectionNav activeView={activeView} onChange={setActiveView} />
-
-        <ModelPicker
-          models={models}
-          providers={providers}
-          providerId={selectedProviderId}
-          selectedModelId={selectedModelId}
-          onProviderChange={setSelectedProviderId}
-          onModelChange={setSelectedModelId}
-        />
 
         <main className="content-stack">
           {shareData ? (
@@ -689,9 +791,7 @@ function App() {
             <a href={repoUrl} target="_blank" rel="noreferrer">
               GitHub repo
             </a>
-            <a href={selectedProvider.sourceUrl} target="_blank" rel="noreferrer">
-              Current pricing source
-            </a>
+            <span>Source-linked provider catalog in app</span>
           </div>
           <div className="site-footer__meta">
             <strong className="text-label">Stats</strong>

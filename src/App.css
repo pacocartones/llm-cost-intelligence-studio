@@ -120,6 +120,20 @@
   align-items: center;
 }
 
+.site-header__status {
+  display: grid;
+  gap: 2px;
+  min-width: 180px;
+}
+
+.site-header__status strong {
+  color: var(--text-primary);
+}
+
+.site-header__status small {
+  color: var(--text-muted);
+}
+
 .site-brand {
   display: inline-flex;
   align-items: center;
@@ -467,6 +481,67 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.workspace-anchor {
+  display: grid;
+  gap: var(--space-5);
+  scroll-margin-top: 110px;
+}
+
+.view-spotlight {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-5);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-2xl);
+  padding: var(--space-5);
+  background:
+    radial-gradient(circle at top right, rgba(6, 182, 212, 0.08), transparent 28%),
+    rgba(12, 18, 37, 0.78);
+}
+
+.view-spotlight__copy {
+  max-width: 760px;
+}
+
+.view-spotlight__copy h2 {
+  margin: var(--space-2) 0 var(--space-3);
+  color: var(--text-primary);
+}
+
+.view-spotlight__copy p:last-child {
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.view-spotlight__meta {
+  min-width: 280px;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.view-spotlight__meta div {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  background: rgba(8, 14, 26, 0.52);
+}
+
+.view-spotlight__meta span {
+  display: block;
+  color: var(--text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.view-spotlight__meta strong {
+  display: block;
+  color: var(--text-primary);
+}
+
+.view-spotlight__meta .ghost-button {
+  width: 100%;
+  justify-content: center;
 }
 
 .overview-band {
@@ -1875,12 +1950,14 @@ select:focus {
 
 .site-footer__copy p,
 .site-footer__links a,
+.site-footer__links span,
 .site-footer__meta span {
   color: var(--text-muted);
 }
 
 .site-footer__copy strong,
 .site-footer__meta span,
+.site-footer__links span,
 .site-footer__links a {
   display: block;
 }
@@ -2461,6 +2538,7 @@ select:focus {
   .plan-brief,
   .provider-summary,
   .site-header__inner,
+  .view-spotlight,
   .site-footer__inner {
     display: grid;
   }
@@ -2475,6 +2553,10 @@ select:focus {
 
   .site-header__actions {
     justify-content: flex-start;
+  }
+
+  .view-spotlight__meta {
+    min-width: 0;
   }
 
   .provider-summary__meta {
@@ -2535,6 +2617,10 @@ select:focus {
   .site-header__nav {
     overflow-x: auto;
     padding-bottom: 4px;
+  }
+
+  .site-header__status {
+    width: 100%;
   }
 
   .site-footer__inner {
