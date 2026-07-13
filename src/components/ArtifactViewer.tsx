@@ -1,3 +1,4 @@
+import { ExecutiveBriefPanel } from './ExecutiveBriefPanel'
 import type { ShareableArtifact } from '../types/shareable'
 
 interface ArtifactViewerProps {
@@ -15,6 +16,23 @@ export function ArtifactViewer({ data, onBack }: ArtifactViewerProps) {
     data.scenario.toolTokens
   const totalOutput = data.scenario.outputTokens
   const totalTokens = totalInput + totalOutput
+  const outputShare = totalTokens > 0 ? Math.round((totalOutput / totalTokens) * 100) : 0
+  const recurringPortfolio = data.portfolioItems.length > 0
+    ? `${data.portfolioItems.length} portfolio items included in the share.`
+    : 'No portfolio items included in this share.'
+  const viewerSummary = `${data.scenario.requestsPerDay.toLocaleString()} requests/day with ${totalTokens.toLocaleString()} tokens per request. ${recurringPortfolio}`
+  const viewerRecommendation =
+    outputShare >= 40
+      ? 'Trim answer length first, then revisit the default model.'
+      : 'Validate the default model and only escalate premium traffic where it changes outcomes.'
+  const viewerRisk =
+    outputShare >= 40
+      ? `${outputShare}% of request tokens are output, so answer policy is a primary cost lever.`
+      : 'The cost profile is more balanced, so routing and traffic growth will likely dominate next.'
+  const viewerNextStep =
+    data.routingSlots.length > 0
+      ? 'Review whether the routing stack should become the production default.'
+      : 'Compare at least one cheaper and one premium model against this baseline.'
 
   function handlePrint() {
     window.print()
@@ -64,6 +82,37 @@ export function ArtifactViewer({ data, onBack }: ArtifactViewerProps) {
           day: 'numeric',
         })}</strong>
       </div>
+
+      <ExecutiveBriefPanel
+        eyebrow="Shared executive brief"
+        title="Portable decision memo"
+        summary={viewerSummary}
+        recommendation={viewerRecommendation}
+        risk={viewerRisk}
+        nextStep={viewerNextStep}
+        metrics={[
+          {
+            label: 'Requests per day',
+            value: data.scenario.requestsPerDay.toLocaleString(),
+            detail: 'Current workload baseline',
+          },
+          {
+            label: 'Tokens per request',
+            value: totalTokens.toLocaleString(),
+            detail: `${outputShare}% output share`,
+          },
+          {
+            label: 'Routing entries',
+            value: `${data.routingSlots.length}`,
+            detail: 'Saved in the shared artifact',
+          },
+          {
+            label: 'Portfolio annualized',
+            value: `$${totalAnnual.toFixed(0)}`,
+            detail: data.portfolioItems.length > 0 ? 'Captured in this share' : 'No portfolio section attached',
+          },
+        ]}
+      />
 
       <div className="viewer-section">
         <p className="eyebrow">Scenario overview</p>

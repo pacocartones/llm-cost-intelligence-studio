@@ -293,6 +293,7 @@ export function CompareScreen({
             key={entry.id}
             type="button"
             className={entry.id === mode ? 'active' : ''}
+            aria-pressed={entry.id === mode}
             onClick={() => setMode(entry.id)}
           >
             <span>{entry.label}</span>

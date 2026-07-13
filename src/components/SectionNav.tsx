@@ -31,6 +31,8 @@ export function SectionNav({ activeView, onChange }: SectionNavProps) {
             key={section.id}
             type="button"
             className={`section-nav__item section-nav__item--${section.tone} ${isActive ? 'active' : ''}`}
+            aria-pressed={isActive}
+            aria-label={`${section.label}: ${section.kicker}`}
             onClick={() => onChange(section.id)}
           >
             <span className="section-nav__icon">{Icons[section.icon]}</span>

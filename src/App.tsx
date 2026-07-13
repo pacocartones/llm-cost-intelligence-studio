@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './styles/global.css'
 import './App.css'
+import { ExecutiveBriefPanel } from './components/ExecutiveBriefPanel'
 import { Icons } from './components/Icons'
 import { ModelPicker } from './components/ModelPicker'
 import { RecentScenarios } from './components/RecentScenarios'
@@ -15,6 +16,7 @@ import { buildOptimizationPlan } from './lib/optimizer'
 import { resolveTemplateScenario } from './lib/benchmarks'
 import { buildRoutingMixFromCatalog } from './lib/routing'
 import { decodeShareData, clearShareFromUrl } from './lib/share'
+import { loadWorkspaceSnapshot, persistWorkspaceSnapshot } from './lib/workspace'
 import { CompareScreen } from './screens/CompareScreen'
 import { ExploreScreen } from './screens/ExploreScreen'
 import { ForecastScreen } from './screens/ForecastScreen'
@@ -194,6 +196,30 @@ const workspaceParts: Array<{
   },
 ]
 
+const guidedWorkflow = [
+  {
+    id: 'foundation',
+    title: 'Frame the workload',
+    description: 'Start from a product pattern and make the scenario realistic.',
+    views: ['explore', 'plan'] as ViewId[],
+    primaryView: 'plan' as ViewId,
+  },
+  {
+    id: 'decision',
+    title: 'Pick the operating default',
+    description: 'Compare candidates, pin tradeoffs, and choose the production path.',
+    views: ['compare', 'optimize'] as ViewId[],
+    primaryView: 'compare' as ViewId,
+  },
+  {
+    id: 'finance',
+    title: 'Validate the budget',
+    description: 'Stress growth, portfolio exposure, and executive tradeoffs.',
+    views: ['forecast', 'portfolio'] as ViewId[],
+    primaryView: 'forecast' as ViewId,
+  },
+]
+
 function loadSavedScenarios() {
   const raw = window.localStorage.getItem(savedScenariosKey)
   if (!raw) return [] as SavedScenario[]
@@ -219,11 +245,19 @@ function loadSavedRoutingStacks() {
 function App() {
   const workspaceAnchorRef = useRef<HTMLElement | null>(null)
   const hasMountedRef = useRef(false)
-  const [activeView, setActiveView] = useState<ViewId>('plan')
-  const [selectedProviderId, setSelectedProviderId] =
-    useState<ProviderId>('anthropic')
-  const [selectedModelId, setSelectedModelId] = useState('claude-sonnet-5')
-  const [scenario, setScenario] = useState<ScenarioInput>(defaultScenario)
+  const workspaceSeedRef = useRef(loadWorkspaceSnapshot())
+  const [activeView, setActiveView] = useState<ViewId>(
+    () => workspaceSeedRef.current?.activeView ?? 'plan',
+  )
+  const [selectedProviderId, setSelectedProviderId] = useState<ProviderId>(
+    () => workspaceSeedRef.current?.selectedProviderId ?? 'anthropic',
+  )
+  const [selectedModelId, setSelectedModelId] = useState(
+    () => workspaceSeedRef.current?.selectedModelId ?? 'claude-sonnet-5',
+  )
+  const [scenario, setScenario] = useState<ScenarioInput>(
+    () => workspaceSeedRef.current?.scenario ?? defaultScenario,
+  )
   const [savedScenarios, setSavedScenarios] = useState<SavedScenario[]>(() =>
     loadSavedScenarios(),
   )
@@ -287,6 +321,18 @@ function App() {
       block: 'start',
     })
   }, [activeView])
+
+  useEffect(() => {
+    if (shareData) return
+
+    persistWorkspaceSnapshot({
+      version: 1,
+      activeView,
+      selectedProviderId,
+      selectedModelId,
+      scenario,
+    })
+  }, [activeView, scenario, selectedModelId, selectedProviderId, shareData])
 
   const selectedModel =
     models.find((model) => model.id === selectedModelId) ?? models[0]
@@ -383,6 +429,11 @@ function App() {
   const activeHeroContent = heroContentByView[activeView]
   const activeWorkspacePart =
     workspaceParts.find((part) => part.views.includes(activeView)) ?? workspaceParts[0]
+  const activeJourneyIndex = guidedWorkflow.findIndex((step) =>
+    step.views.includes(activeView),
+  )
+  const nextJourneyStep =
+    guidedWorkflow[Math.min(activeJourneyIndex + 1, guidedWorkflow.length - 1)]
   const showHomeScaffold = activeView === 'plan' && !shareData
   const showModelPicker =
     !shareData &&
@@ -414,6 +465,38 @@ function App() {
 
   const repoUrl = 'https://github.com/pacocartones/llm-cost-intelligence-studio'
   const liveDemoUrl = 'https://pacocartones.github.io/llm-cost-intelligence-studio/'
+  const executiveSummary = alternativeModel
+    ? `${alternativeModel.model.name} is currently the fastest savings move for this workload without changing the product shape first.`
+    : `${selectedModel.name} is already close to the cost floor, so the next win is more architectural than vendor-driven.`
+  const executiveRecommendation = alternativeModel
+    ? `Shift the default lane toward ${alternativeModel.model.name} or make it the cheaper tier inside a routing mix.`
+    : `Keep ${selectedModel.name} as the anchor, but tighten output policy, caching discipline, and retrieval overhead before changing vendors.`
+  const executiveRisk = `${scenarioRiskLabel}. ${Math.round(outputShare * 100)}% of request tokens are output, and the current run-rate models at $${currentCost.monthlyRecurring.toFixed(0)}/month.`
+  const executiveNextStep = `${nextJourneyStep.title} in ${viewSpotlights[nextJourneyStep.primaryView].label}.`
+  const executiveMetrics = [
+    {
+      label: 'Current default',
+      value: selectedModel.name,
+      detail: `${selectedProvider.name} · ${selectedModel.label}`,
+    },
+    {
+      label: 'Monthly run-rate',
+      value: `$${currentCost.monthlyRecurring.toFixed(0)}`,
+      detail: `${scenario.requestsPerDay.toLocaleString()} requests/day modeled`,
+    },
+    {
+      label: 'Cheapest viable floor',
+      value: `$${cheapestScenarioModel.monthly.toFixed(0)}`,
+      detail: cheapestScenarioModel.model.name,
+    },
+    {
+      label: 'Savings headroom',
+      value: alternativeModel ? `$${monthlySavingsOpportunity.toFixed(0)}/mo` : 'Architectural',
+      detail: alternativeModel
+        ? `Compared with ${selectedModel.name}`
+        : 'No obvious cheaper one-model switch',
+    },
+  ]
 
   const planShareArtifact: ShareableArtifact = {
     version: 1,
@@ -728,6 +811,56 @@ function App() {
           </div>
         </header>
 
+        {!shareData ? (
+          <section className="guided-workflow" aria-label="Guided workflow">
+            <div className="guided-workflow__header">
+              <div>
+                <p className="eyebrow">Start here</p>
+                <h2>Run the workspace in three deliberate passes</h2>
+              </div>
+              <p className="guided-workflow__copy">
+                This makes the product easier to read: define the workload, decide the
+                operating model, then validate the budget and executive implications.
+              </p>
+            </div>
+            <div className="guided-workflow__grid">
+              {guidedWorkflow.map((step, index) => {
+                const isActive = step.views.includes(activeView)
+                const isComplete = activeJourneyIndex > index
+                const stateLabel = isActive
+                  ? 'Current'
+                  : isComplete
+                    ? 'Completed'
+                    : 'Upcoming'
+
+                return (
+                  <article
+                    key={step.id}
+                    className={`guided-step ${isActive ? 'active' : ''} ${
+                      isComplete ? 'complete' : ''
+                    }`}
+                  >
+                    <div className="guided-step__header">
+                      <span>{`0${index + 1}`}</span>
+                      <strong>{stateLabel}</strong>
+                    </div>
+                    <h3>{step.title}</h3>
+                    <p>{step.description}</p>
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      aria-pressed={isActive}
+                      onClick={() => setActiveView(step.primaryView)}
+                    >
+                      {isActive ? 'You are here' : `Open ${viewSpotlights[step.primaryView].label}`}
+                    </button>
+                  </article>
+                )
+              })}
+            </div>
+          </section>
+        ) : null}
+
         {showHomeScaffold ? (
           <>
             <section className="overview-band">
@@ -824,6 +957,18 @@ function App() {
                 </button>
               </div>
             </section>
+
+            <ExecutiveBriefPanel
+              eyebrow="Executive brief"
+              title="Decision memo for product, finance, and leadership"
+              summary={executiveSummary}
+              recommendation={executiveRecommendation}
+              risk={executiveRisk}
+              nextStep={executiveNextStep}
+              metrics={executiveMetrics}
+              onPrimaryAction={() => setActiveView(nextJourneyStep.primaryView)}
+              primaryActionLabel={`Open ${viewSpotlights[nextJourneyStep.primaryView].label}`}
+            />
           </>
         ) : null}
 
@@ -849,6 +994,7 @@ function App() {
                         key={view}
                         type="button"
                         className={view === activeView ? 'active' : ''}
+                        aria-pressed={view === activeView}
                         onClick={() => setActiveView(view)}
                       >
                         {viewSpotlights[view].label}

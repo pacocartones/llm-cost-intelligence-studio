@@ -212,6 +212,7 @@ export function ExploreScreen({
             key={id}
             type="button"
             className={id === filter ? 'active' : ''}
+            aria-pressed={id === filter}
             onClick={() => setFilter(id)}
           >
             <span>{label}</span>

@@ -26,11 +26,15 @@ export function ShareButton({ artifact }: ShareButtonProps) {
       <div className="share-panel__copy">
         <span>Share or export</span>
         <small>Send a live URL or keep a JSON snapshot of this planning state.</small>
+        <span className="sr-only" aria-live="polite">
+          {copied ? 'Share link copied to clipboard.' : ''}
+        </span>
       </div>
       <div className="share-group">
         <button
           type="button"
           className="ghost-button"
+          aria-label="Copy share link to clipboard"
           onClick={handleCopyLink}
         >
           {copied ? 'Link copied!' : 'Copy share link'}
@@ -38,6 +42,7 @@ export function ShareButton({ artifact }: ShareButtonProps) {
         <button
           type="button"
           className="ghost-button"
+          aria-label="Export planning state as JSON"
           onClick={handleDownloadJson}
         >
           Export JSON

@@ -255,6 +255,7 @@ export function ForecastScreen({ scenario, cost }: ForecastScreenProps) {
             key={mode.id}
             type="button"
             className={mode.id === finance.growthPosture ? 'active' : ''}
+            aria-pressed={mode.id === finance.growthPosture}
             onClick={() => setFinance((f) => ({ ...f, growthPosture: mode.id }))}
           >
             <span>{mode.label}</span>

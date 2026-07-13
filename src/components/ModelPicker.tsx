@@ -1,4 +1,5 @@
-import type { ModelRecord, Provider, ProviderId } from '../types/domain'
+import { useEffect, useMemo, useState } from 'react'
+import type { ModelRecord, ModelTier, Provider, ProviderId } from '../types/domain'
 
 interface ModelPickerProps {
   models: ModelRecord[]
@@ -18,6 +19,24 @@ const providerOrder: { id: ProviderId; label: string }[] = [
   { id: 'deepseek', label: 'DeepSeek' },
 ]
 
+type CapabilityFilter = 'all' | 'reasoning' | 'tools' | 'vision' | 'caching'
+type TierFilter = 'all' | ModelTier
+
+const tierFilters: Array<{ id: TierFilter; label: string }> = [
+  { id: 'all', label: 'All tiers' },
+  { id: 'flagship', label: 'Flagship' },
+  { id: 'balanced', label: 'Balanced' },
+  { id: 'efficient', label: 'Efficient' },
+]
+
+const capabilityFilters: Array<{ id: CapabilityFilter; label: string }> = [
+  { id: 'all', label: 'Any capability' },
+  { id: 'reasoning', label: 'Reasoning' },
+  { id: 'tools', label: 'Tools' },
+  { id: 'vision', label: 'Vision' },
+  { id: 'caching', label: 'Caching' },
+]
+
 export function ModelPicker({
   models,
   providers,
@@ -26,10 +45,66 @@ export function ModelPicker({
   onProviderChange,
   onModelChange,
 }: ModelPickerProps) {
-  const providerModels = models.filter((model) => model.providerId === providerId)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [tierFilter, setTierFilter] = useState<TierFilter>('all')
+  const [capabilityFilter, setCapabilityFilter] = useState<CapabilityFilter>('all')
+  const [verifiedOnly, setVerifiedOnly] = useState(false)
+  const [compareIds, setCompareIds] = useState<string[]>([])
+
+  const providerModels = useMemo(
+    () => models.filter((model) => model.providerId === providerId),
+    [models, providerId],
+  )
   const provider = providers.find((entry) => entry.id === providerId)
   const selectedModel =
     providerModels.find((model) => model.id === selectedModelId) ?? providerModels[0]
+  const filteredProviderModels = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase()
+
+    return providerModels.filter((model) => {
+      if (verifiedOnly && model.pricingStatus !== 'verified') return false
+      if (tierFilter !== 'all' && model.tier !== tierFilter) return false
+      if (capabilityFilter !== 'all' && !model.capabilities[capabilityFilter]) return false
+
+      if (!normalizedQuery) return true
+
+      return [
+        model.name,
+        model.summary,
+        model.label,
+        model.family,
+        ...model.badges,
+        ...model.recommendedFor,
+      ]
+        .join(' ')
+        .toLowerCase()
+        .includes(normalizedQuery)
+    })
+  }, [capabilityFilter, providerModels, searchQuery, tierFilter, verifiedOnly])
+  const compareModels = useMemo(
+    () => providerModels.filter((model) => compareIds.includes(model.id)),
+    [compareIds, providerModels],
+  )
+
+  useEffect(() => {
+    setCompareIds((current) =>
+      current.filter((modelId) => providerModels.some((model) => model.id === modelId)),
+    )
+  }, [providerModels])
+
+  function toggleCompare(modelId: string) {
+    setCompareIds((current) => {
+      if (current.includes(modelId)) {
+        return current.filter((entry) => entry !== modelId)
+      }
+
+      if (current.length >= 3) {
+        return [...current.slice(1), modelId]
+      }
+
+      return [...current, modelId]
+    })
+  }
 
   return (
     <section className="panel">
@@ -44,18 +119,67 @@ export function ModelPicker({
         </p>
       </div>
 
-      <div className="provider-pills">
+      <div className="provider-pills" role="tablist" aria-label="Provider families">
         {providerOrder.map((provider) => (
           <button
             key={provider.id}
             type="button"
             className={provider.id === providerId ? 'active' : ''}
+            aria-pressed={provider.id === providerId}
             onClick={() => onProviderChange(provider.id)}
           >
             {provider.label}
           </button>
         ))}
       </div>
+
+      <section className="catalog-toolbar" aria-label="Model catalog filters">
+        <label className="catalog-toolbar__search">
+          Search models
+          <input
+            type="search"
+            placeholder="Search by name, badge, use case, or family"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+          />
+        </label>
+        <label>
+          Tier
+          <select
+            value={tierFilter}
+            onChange={(event) => setTierFilter(event.target.value as TierFilter)}
+          >
+            {tierFilters.map((filter) => (
+              <option key={filter.id} value={filter.id}>
+                {filter.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Capability
+          <select
+            value={capabilityFilter}
+            onChange={(event) =>
+              setCapabilityFilter(event.target.value as CapabilityFilter)
+            }
+          >
+            {capabilityFilters.map((filter) => (
+              <option key={filter.id} value={filter.id}>
+                {filter.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="button"
+          className={`toggle-pill ${verifiedOnly ? 'active' : ''}`}
+          aria-pressed={verifiedOnly}
+          onClick={() => setVerifiedOnly((current) => !current)}
+        >
+          Verified only
+        </button>
+      </section>
 
       {provider ? (
         <div className="provider-summary">
@@ -117,13 +241,67 @@ export function ModelPicker({
         </div>
       ) : null}
 
+      {compareModels.length > 0 ? (
+        <section className="compare-tray" aria-label="Pinned model comparison">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">Quick compare tray</p>
+              <h4>Hold up to three candidates side by side</h4>
+            </div>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => setCompareIds([])}
+            >
+              Clear tray
+            </button>
+          </div>
+          <div className="compare-tray__grid">
+            {compareModels.map((model) => (
+              <article key={model.id} className="compare-tray__card">
+                <div className="compare-tray__head">
+                  <strong>{model.name}</strong>
+                  <span className={`tier-badge tier-${model.tier}`}>{model.label}</span>
+                </div>
+                <div className="compare-tray__stats">
+                  <div>
+                    <span>Input</span>
+                    <strong>${model.inputPerMTok}/M</strong>
+                  </div>
+                  <div>
+                    <span>Output</span>
+                    <strong>${model.outputPerMTok}/M</strong>
+                  </div>
+                  <div>
+                    <span>Context</span>
+                    <strong>{model.contextWindowK}k</strong>
+                  </div>
+                </div>
+                <p>{model.summary}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <div className="catalog-results-bar" aria-live="polite">
+        <span>{filteredProviderModels.length} models visible</span>
+        <small>
+          {compareModels.length > 0
+            ? `${compareModels.length} pinned for quick comparison`
+            : 'Pin up to 3 models to compare them side by side'}
+        </small>
+      </div>
+
       <div className="model-grid">
-        {providerModels.map((model) => (
-          <button
+        {filteredProviderModels.map((model) => {
+          const isSelected = model.id === selectedModelId
+          const isPinned = compareIds.includes(model.id)
+
+          return (
+          <article
             key={model.id}
-            type="button"
-            className={`model-card ${model.id === selectedModelId ? 'selected' : ''}`}
-            onClick={() => onModelChange(model.id)}
+            className={`model-card ${isSelected ? 'selected' : ''}`}
           >
             <div className="model-card__top">
               <div>
@@ -158,6 +336,24 @@ export function ModelPicker({
             <p className="model-card__note">
               Best for {model.recommendedFor.slice(0, 2).join(' and ')}.
             </p>
+            <div className="model-card__actions">
+              <button
+                type="button"
+                className="ghost-button"
+                aria-pressed={isSelected}
+                onClick={() => onModelChange(model.id)}
+              >
+                {isSelected ? 'Selected model' : 'Select model'}
+              </button>
+              <button
+                type="button"
+                className={`toggle-pill ${isPinned ? 'active' : ''}`}
+                aria-pressed={isPinned}
+                onClick={() => toggleCompare(model.id)}
+              >
+                {isPinned ? 'Pinned' : 'Pin to compare'}
+              </button>
+            </div>
             <div className="model-card__footer">
               <span className={`status-pill status-${model.pricingStatus}`}>
                 {model.pricingStatus}
@@ -170,9 +366,16 @@ export function ModelPicker({
                 <small>{model.sourceLabel ?? 'Internal catalog note'}</small>
               )}
             </div>
-          </button>
-        ))}
+          </article>
+        )})}
       </div>
+
+      {filteredProviderModels.length === 0 ? (
+        <div className="notice info">
+          <strong>No models match these filters.</strong> Try clearing the search or
+          relaxing the tier and capability filters.
+        </div>
+      ) : null}
     </section>
   )
 }
